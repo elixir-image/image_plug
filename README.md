@@ -1,6 +1,6 @@
-# PlugImage
+# Plug Image
 
-**TODO: Add description**
+A Plug that interprets image URLs and applies appropriate transforms before streaming the image to the client. An library that performs similar functions to [imgix](https://imgix.com) and intended to have compatible URL structures.
 
 ## Installation
 
