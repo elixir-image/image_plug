@@ -1,4 +1,4 @@
-# Plug Image
+# Image Plug
 
 A Plug that interprets image URLs and applies appropriate transforms before streaming the image to the client. An library that performs similar functions to [imgix](https://imgix.com) and intended to have compatible URL structures.
 
@@ -10,12 +10,12 @@ by adding `plug_image` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:plug_image, "~> 0.1.0"}
+    {:image_plug_, "~> 0.1.0"}
   ]
 end
 ```
 
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/plug_image>.
+be found at <https://hexdocs.pm/image_plug>.
 
