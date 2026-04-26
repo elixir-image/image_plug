@@ -83,11 +83,18 @@ defmodule Image.Plug.Provider.Imgix.Options do
   }
 
   @unsupported_keys %{
-    "sepia" => "imgix `sepia=` requires `Image.sepia/1` — see TODO.md",
-    "cs" => "imgix `cs=` (colour-space conversion) needs an `Image.colorspace/2` mid-pipeline helper — see TODO.md",
-    "or" => "imgix `or=` (EXIF orientation override) needs `Image` to expose orientation control — see TODO.md",
-    "monochrome" => "imgix `monochrome=` needs `Image.monochrome/2` — see TODO.md",
-    "px" => "imgix `px=` (pixelate) needs `Image.pixelate/2` — see TODO.md"
+    "sepia" => "imgix `sepia=` requires a sepia helper in the Image library — see TODO.md",
+    "or" => "imgix `or=` (EXIF orientation override) needs the Image library to expose orientation control — see TODO.md",
+    "px" => "imgix `px=` (pixelate) needs a pixelate helper in the Image library — see TODO.md"
+  }
+
+  # imgix's `cs=<value>` accepts a small set of named colorspaces.
+  # Map them to the atoms `Image.to_colorspace/2` accepts.
+  @cs_to_target %{
+    "srgb" => :srgb,
+    "strip" => :srgb,
+    "cmyk" => :cmyk,
+    "rgb" => :rgb
   }
 
   @unsupported_auto %{
@@ -192,6 +199,7 @@ defmodule Image.Plug.Provider.Imgix.Options do
       find_one(acc.appended, Ops.Background),
       find_one(acc.appended, Ops.Border),
       acc.adjust,
+      find_one(acc.appended, Ops.Colorspace),
       find_one(acc.appended, Ops.Sharpen),
       find_one(acc.appended, Ops.Blur),
       acc.draw_layer
@@ -435,6 +443,33 @@ defmodule Image.Plug.Provider.Imgix.Options do
       _ ->
         {:error, invalid("border", value)}
     end
+  end
+
+  # Colorspace -------------------------------------------------------
+
+  defp apply_entry("cs", value, acc, _strict?) do
+    case Map.fetch(@cs_to_target, value) do
+      {:ok, target} ->
+        op = %Ops.Colorspace{target: target}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error,
+         Error.new(:unsupported_option,
+           "imgix `cs=#{value}` not implemented (Adobe RGB and other ICC profiles need a `colorspace/3` helper that accepts ICC strings — see TODO.md)",
+           details: %{key: "cs", value: value}
+         )}
+    end
+  end
+
+  # imgix `monochrome=<hex>` is a tinted monochrome (B&W image with a
+  # named colour replacing what would be black). v0.1 ships plain B&W
+  # via `Image.to_colorspace(image, :bw)`; the hex tint is parsed but
+  # not yet applied (would need a composite op on a coloured layer).
+  # Documented as ⚠️ in the conformance guide.
+  defp apply_entry("monochrome", _value, acc, _strict?) do
+    op = %Ops.Colorspace{target: :bw}
+    {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
   end
 
   # Overlays ---------------------------------------------------------

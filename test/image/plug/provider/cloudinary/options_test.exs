@@ -117,6 +117,62 @@ defmodule Image.Plug.Provider.Cloudinary.OptionsTest do
       assert {:ok, %Pipeline{ops: [%Ops.Background{color: "#ff0000"}]}} =
                Options.parse("b_rgb:ff0000")
     end
+
+    test "e_replace_color:<to> emits ReplaceColor with :auto source" do
+      assert {:ok, %Pipeline{ops: [%Ops.ReplaceColor{} = op]}} =
+               Options.parse("e_replace_color:white")
+
+      assert op.to == "white"
+      assert op.from == :auto
+      assert op.threshold == 50
+    end
+
+    test "e_replace_color:<to>:<tolerance>" do
+      assert {:ok, %Pipeline{ops: [%Ops.ReplaceColor{to: "white", threshold: 30}]}} =
+               Options.parse("e_replace_color:white:30")
+    end
+
+    test "e_replace_color:<to>:<tolerance>:<from> with hex inputs" do
+      assert {:ok,
+              %Pipeline{
+                ops: [
+                  %Ops.ReplaceColor{
+                    to: "#ffffff",
+                    from: "#ff0000",
+                    threshold: 25
+                  }
+                ]
+              }} = Options.parse("e_replace_color:ffffff:25:ff0000")
+    end
+
+    test "e_replace_color with rgb:RRGGBB source" do
+      assert {:ok,
+              %Pipeline{
+                ops: [%Ops.ReplaceColor{from: "#abcdef"}]
+              }} = Options.parse("e_replace_color:white:50:rgb:abcdef")
+    end
+
+    test "e_replace_color tolerance must be a non-negative integer" do
+      assert {:error, %Error{tag: :invalid_option}} =
+               Options.parse("e_replace_color:white:notanumber")
+    end
+  end
+
+  describe "colorspace" do
+    test "cs_srgb emits a Colorspace op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :srgb}]}} =
+               Options.parse("cs_srgb")
+    end
+
+    test "cs_tinysrgb maps to :srgb (Cloudinary's tinification is a product layer, not a colorspace)" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :srgb}]}} =
+               Options.parse("cs_tinysrgb")
+    end
+
+    test "cs_cmyk emits a Colorspace{target: :cmyk}" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :cmyk}]}} =
+               Options.parse("cs_cmyk")
+    end
   end
 
   describe "geometry" do
@@ -165,8 +221,8 @@ defmodule Image.Plug.Provider.Cloudinary.OptionsTest do
       assert {:error, %Error{tag: :unsupported_option}} = Options.parse("e_pixelate:30")
     end
 
-    test "cs_ returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("cs_srgb")
+    test "cs_<unsupported> returns :unsupported_option" do
+      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("cs_adobergb")
     end
 
     test "t_<name> returns :unsupported_option" do

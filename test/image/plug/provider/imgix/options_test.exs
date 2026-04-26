@@ -141,12 +141,34 @@ defmodule Image.Plug.Provider.Imgix.OptionsTest do
     end
   end
 
+  describe "colorspace" do
+    test "cs=srgb emits a Colorspace op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :srgb}]}} =
+               Options.parse("cs=srgb")
+    end
+
+    test "cs=cmyk emits a Colorspace op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :cmyk}]}} =
+               Options.parse("cs=cmyk")
+    end
+
+    test "cs=strip is treated as a sRGB conversion (drops embedded ICC profiles)" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :srgb}]}} =
+               Options.parse("cs=strip")
+    end
+
+    test "monochrome=<hex> emits a Colorspace{target: :bw} op (hex tint not yet honoured)" do
+      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :bw}]}} =
+               Options.parse("monochrome=ff0000")
+    end
+  end
+
   describe "unsupported / unknown" do
     test "sepia returns :unsupported_option" do
       assert {:error, %Error{tag: :unsupported_option}} = Options.parse("sepia=80")
     end
 
-    test "cs returns :unsupported_option" do
+    test "cs=adobergb1998 returns :unsupported_option (Adobe RGB needs ICC support)" do
       assert {:error, %Error{tag: :unsupported_option}} = Options.parse("cs=adobergb1998")
     end
 

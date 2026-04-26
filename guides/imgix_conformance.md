@@ -77,7 +77,7 @@ Every option imgix documents in [the rendering reference](https://docs.imgix.com
 | `sharp` | ✅ | 0..100; `sigma = N / 10`. |
 | `bri` / `con` / `sat` / `gam` | ✅ | -100..100 mapped to multiplier `1.0 + N/100`. |
 | `sepia` | ❌ | Needs a `sepia/1` helper in the Image library — returns `:unsupported_option`. |
-| `monochrome` | ❌ | Needs a `monochrome/2` helper in the Image library — returns `:unsupported_option`. |
+| `monochrome=<hex>` | ⚠️ | Produces plain black-and-white via `Image.to_colorspace(:bw)`. The hex tint (a coloured monochrome overlay) is parsed but not yet applied — would need a composite step on a coloured layer. Documented as a follow-up. |
 | `px` (pixelate) | ❌ | Needs a `pixelate/2` helper in the Image library. |
 
 ### Geometry
@@ -107,7 +107,8 @@ Every option imgix documents in [the rendering reference](https://docs.imgix.com
 
 | Key | Status | Notes |
 | --- | --- | --- |
-| `cs` (colour space) | ❌ | Needs a `colorspace/2` helper in the Image library for mid-pipeline conversion. Returns `:unsupported_option`. |
+| `cs=srgb` / `cs=cmyk` / `cs=rgb` / `cs=strip` | ✅ | Wraps `Image.to_colorspace/2`. `strip` is treated as a sRGB conversion (drops embedded ICC profiles by re-interpreting). |
+| `cs=adobergb1998` | ❌ | Adobe RGB is an ICC-profile target, not one of libvips' built-in interpretations. Needs a 3-arity `to_colorspace` (or `icc_transform`) helper in the Image library that accepts ICC profile strings. Returns `:unsupported_option`. |
 | `expires` | ✅ | Used by signing; the verifier rejects after this unix-seconds timestamp. |
 | `s` | ✅ | HMAC signature. |
 | `ixlib` / `ixid` | ✅ | imgix client-identification keys. Recognised and silently ignored. |
@@ -133,10 +134,10 @@ imgix documents that `crop=` is only honoured when `fit=crop` (or `fit=facearea`
 | URL forms | Full | Web folder + web proxy + signed. |
 | Sizing options (`w`/`h`/`fit`/`crop`/`fp-x`/`fp-y`) | High | `fit=clamp` and `fit=min` approximated. |
 | Output format (`fm`, `auto=format`) | High | `auto=enhance` deferred. |
-| Effects (`bg`/`blur`/`sharp`/colour adjusts) | High | `sepia`/`monochrome`/`px` deferred to `Image` upstream. |
+| Effects (`bg`/`blur`/`sharp`/colour adjusts/`monochrome`) | High | `monochrome=` produces plain B&W (hex tint not yet honoured); `sepia`/`px` deferred to `Image` upstream. |
 | Geometry (`flip`/`rot`/`trim`/`border`) | High | `rot` 90-multiples only. |
 | Overlays (`mark*`) | Partial | Common subset; `mark-pad`/`markalign=middle` deferred. |
-| Colour-space (`cs`) | None | Deferred to `Image` upstream. |
+| Colour-space (`cs`) | High | `srgb`/`cmyk`/`rgb`/`strip` supported; `adobergb1998` deferred (needs ICC-profile support). |
 | Signed URLs | Full | Wire-format-compatible with imgix's hosted service. |
 
 ## Reporting gaps

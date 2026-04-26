@@ -41,6 +41,24 @@ defmodule Image.Plug.Integration.ImgixTest do
     assert response.headers["content-type"] == ["image/webp; charset=utf-8"]
   end
 
+  test "monochrome= produces a single-channel image (B&W)", %{base_url: base_url} do
+    {:ok, response} = request("/portrait.jpg?monochrome=ff0000&fm=jpeg", base_url: base_url)
+
+    assert response.status == 200
+    assert response.headers["content-type"] == ["image/jpeg; charset=utf-8"]
+
+    {:ok, decoded} = Image.from_binary(response.body)
+    # JPEG decode of a B&W source produces a single-channel image.
+    assert Image.bands(decoded) == 1
+  end
+
+  test "cs=srgb converts the colorspace and returns valid bytes", %{base_url: base_url} do
+    {:ok, response} = request("/portrait.jpg?cs=srgb&fm=jpeg", base_url: base_url)
+
+    assert response.status == 200
+    assert {:ok, _decoded} = Image.from_binary(response.body)
+  end
+
   test "unsupported sepia returns 400 :unsupported_option", %{base_url: base_url} do
     {:ok, response} = request("/portrait.jpg?sepia=80", base_url: base_url)
 

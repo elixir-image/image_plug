@@ -49,11 +49,14 @@ defmodule Image.Plug.Pipeline.NormaliserTest do
     test "reorders ops into canonical position regardless of input order" do
       # Construct in *reverse* canonical order. Normaliser must
       # reorder to: Trim -> Background -> Resize -> Rotate -> Flip
-      # -> Border -> Adjust -> Blur -> Sharpen -> Draw.
+      # -> Border -> Adjust -> Colorspace -> ReplaceColor -> Blur ->
+      # Sharpen -> Draw.
       pipeline =
         Pipeline.new()
         |> Pipeline.append(%Ops.Sharpen{sigma: 1.0})
         |> Pipeline.append(%Ops.Blur{sigma: 1.0})
+        |> Pipeline.append(%Ops.ReplaceColor{to: "#000000", from: "#ffffff", threshold: 30})
+        |> Pipeline.append(%Ops.Colorspace{target: :srgb})
         |> Pipeline.append(%Ops.Adjust{brightness: 1.1})
         |> Pipeline.append(%Ops.Border{color: "#fff", top: 1, right: 1, bottom: 1, left: 1})
         |> Pipeline.append(%Ops.Flip{direction: :horizontal})
@@ -72,9 +75,35 @@ defmodule Image.Plug.Pipeline.NormaliserTest do
                Ops.Flip,
                Ops.Border,
                Ops.Adjust,
+               Ops.Colorspace,
+               Ops.ReplaceColor,
                Ops.Blur,
                Ops.Sharpen
              ]
+    end
+
+    test "Colorspace lands between Adjust and ReplaceColor" do
+      pipeline =
+        Pipeline.new()
+        |> Pipeline.append(%Ops.ReplaceColor{to: "#000", from: "#fff"})
+        |> Pipeline.append(%Ops.Colorspace{target: :bw})
+        |> Pipeline.append(%Ops.Adjust{brightness: 1.1})
+
+      {:ok, %Pipeline{ops: ops}} = Normaliser.normalise(pipeline)
+
+      assert [%Ops.Adjust{}, %Ops.Colorspace{}, %Ops.ReplaceColor{}] = ops
+    end
+
+    test "ReplaceColor lands between Adjust and Blur" do
+      pipeline =
+        Pipeline.new()
+        |> Pipeline.append(%Ops.Blur{sigma: 1.0})
+        |> Pipeline.append(%Ops.ReplaceColor{to: "#000000", from: "#ffffff"})
+        |> Pipeline.append(%Ops.Adjust{brightness: 1.1})
+
+      {:ok, %Pipeline{ops: ops}} = Normaliser.normalise(pipeline)
+
+      assert [%Ops.Adjust{}, %Ops.ReplaceColor{}, %Ops.Blur{}] = ops
     end
 
     test "blur runs before sharpen (Sharp's rule)" do

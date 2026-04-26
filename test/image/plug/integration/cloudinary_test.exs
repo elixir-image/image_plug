@@ -61,6 +61,21 @@ defmodule Image.Plug.Integration.CloudinaryTest do
     assert response.status == 200
   end
 
+  test "e_replace_color runs end-to-end and returns valid bytes", %{base_url: base_url} do
+    {:ok, response} =
+      request("/demo/image/upload/e_replace_color:white:50,f_jpg/portrait.jpg",
+        base_url: base_url
+      )
+
+    assert response.status == 200
+    assert response.headers["content-type"] == ["image/jpeg; charset=utf-8"]
+
+    # Just confirm libvips returns a decodable image — pixel-level
+    # before/after comparison would be an Image-library test, not an
+    # image_plug test.
+    assert {:ok, _decoded} = Image.from_binary(response.body)
+  end
+
   test "unsupported e_vignette returns 400 :unsupported_option", %{base_url: base_url} do
     {:ok, response} =
       request("/demo/image/upload/e_vignette/portrait.jpg", base_url: base_url)

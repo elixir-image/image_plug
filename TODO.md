@@ -32,13 +32,13 @@ Captured for the `Image` library author at `../image`. Each CDN adapter in this 
 
 * **`Image.sepia/1`** — single-pass sepia tone. Imgix `sepia=N` (0-100) is documented; we currently `:unsupported_option` it.
 
-* **`Image.monochrome/2`** — single-colour tint (typically used as a brand-colour overlay). Imgix `monochrome=<hex>`. We approximate today (`Adjust{saturation: 0}` plus a `Background` overlay) but a single op would be cleaner and faster.
+* **Tinted monochrome** — partially done. Plain B&W is now wired up via the new `Image.Plug.Pipeline.Ops.Colorspace{target: :bw}` op (delegates to `Image.to_colorspace/2`), used by both imgix `monochrome=<hex>` and any future `Colorspace{target: :bw}` use site. The hex tint (a coloured monochrome overlay; black areas of the image become the chosen colour) still needs a composite step on a coloured layer — could be expressed in the IR by chaining the existing `%Background{}` and `%Draw{}` ops once the IR supports a `multiply` or `over` blend mode on layers.
 
 * **`Image.enhance/1`** — content-aware automatic enhancement (white balance, tone curve). Imgix `auto=enhance`, Cloudinary `e_improve`, ImageKit `e-enhance`. AI-flavoured but usually a fixed pipeline of contrast/saturation/sharpening adjustments derived from image statistics.
 
 * **EXIF orientation override** — `Image.open/2` auto-rotates per EXIF orientation. Imgix `or=<N>` lets the user override. No clean current path; would need an `:autorotate?` option on `Image.open/2` and a separate `Image.set_orientation/2`.
 
-* **Colour-space conversion as a request-level op** — `Image` has ICC-profile import/export options on `Image.open/2` and `Image.write/3` but no mid-pipeline "convert to sRGB" or "convert to Adobe RGB" helper. Imgix `cs=srgb` / `cs=adobergb1998`, Cloudinary `cs_srgb`. Likely just a thin wrapper over `Operation.icc_transform`.
+* **Colour-space conversion as a request-level op** — partially done. Named-colorspace conversion (`:srgb`, `:cmyk`, `:rgb`, `:bw`, …) is now wired up via the new `Image.Plug.Pipeline.Ops.Colorspace` op, which delegates to `Image.to_colorspace/2`. Used by imgix `cs=srgb`/`cs=cmyk`/`cs=rgb`/`cs=strip` and Cloudinary `cs_srgb`/`cs_tinysrgb`/`cs_cmyk`/`cs_no_cmyk`. ICC-profile-targeted colorspaces (Adobe RGB, custom ICC) still need an `Image.to_colorspace/3` (or `Image.icc_transform/2`) helper that accepts ICC profile strings — those return `:unsupported_option` today.
 
 ### Needed for full Cloudinary conformance
 
@@ -48,7 +48,7 @@ Captured for the `Image` library author at `../image`. Each CDN adapter in this 
 
 * **Cartoonify / posterize** — level count. Cloudinary `e_cartoonify`. Returns `:unsupported_option` today.
 
-* **Colour-replace** — replace pixels matching a source colour with a target colour, with tolerance. Cloudinary `e_replace_color`. Returns `:unsupported_option` today.
+* **Colour-replace** — DONE. Implemented in `image_plug` via the new `Image.Plug.Pipeline.Ops.ReplaceColor` IR op, wrapping `Image.replace_color/2`. Cloudinary `e_replace_color:<to>[:<tolerance>[:<from>]]` parses cleanly into the op; the interpreter delegates to the Image library which handles both threshold and range strategies. Conformance guide upgraded ❌ → ✅.
 
 * **Gradient fade overlay** — alpha-gradient fade-out on one or more edges. Cloudinary `e_fade`. Returns `:unsupported_option` today.
 

@@ -85,7 +85,7 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | `e_vignette` | ❌ | Needs a vignette helper — returns `:unsupported_option`. |
 | `e_pixelate` / `e_pixelate_faces` | ❌ | Needs a pixelate helper — returns `:unsupported_option`. |
 | `e_cartoonify` | ❌ | Needs a posterize helper — returns `:unsupported_option`. |
-| `e_replace_color` | ❌ | Needs a colour-replace helper — returns `:unsupported_option`. |
+| `e_replace_color:<to>[:<tolerance>[:<from>]]` | ✅ | Wraps `Image.replace_color/2`. Defaults: `<from>` = `:auto` (top-left 10×10 average), `<tolerance>` = 50. Colours accept hex (`ffffff`), `rgb:RRGGBB` form, and CSS names. |
 | `e_fade` | ❌ | Needs a gradient overlay helper — returns `:unsupported_option`. |
 | `e_improve` / `e_auto_brightness` / `e_auto_color` / `e_auto_contrast` | ❌ | Needs an enhance helper — returns `:unsupported_option`. |
 | `e_redeye` | ❌ | Returns `:unsupported_option`. |
@@ -112,7 +112,8 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 
 | Key | Status | Notes |
 | --- | --- | --- |
-| `cs_<colorspace>` | ❌ | Needs a `colorspace/2` helper in the Image library. Returns `:unsupported_option`. |
+| `cs_srgb` / `cs_tinysrgb` / `cs_cmyk` / `cs_no_cmyk` | ✅ | Wraps `Image.to_colorspace/2`. `cs_tinysrgb` and `cs_no_cmyk` both map to `:srgb` (Cloudinary's tinification is a product layer, not a libvips colorspace). |
+| `cs_<other>` (Adobe RGB, custom ICC profiles) | ❌ | Needs a 3-arity `to_colorspace` (or `icc_transform`) helper in the Image library that accepts ICC profile strings. Returns `:unsupported_option`. |
 | `t_<name>` | ❌ | Named (server-side alias) transformations are not modelled by the IR. Returns `:unsupported_option`. |
 | `if_<predicate>` | ❌ | Conditional transforms not implemented. |
 | `vc_<codec>` / `ac_<codec>` / `br_<rate>` | ❌ | Video-only options. Returns `:unsupported_option`. |
@@ -146,10 +147,10 @@ Cloudinary's `q_auto` (and its variants `q_auto:eco`, `q_auto:good`, `q_auto:bes
 | URL forms | High | Single-stage upload + fetch + signed all wire-compatible; multi-stage flattens. |
 | Sizing options (`w`/`h`/`c_`/`g_`/`x_`/`y_`) | High | `c_imagga_*` and `g_auto:*` approximated. |
 | Output format (`f_`, `q_`, `dpr_`) | High | `q_auto` doesn't auto-tune; `dpr_` capped at 3. |
-| Effects (`b_`/`e_blur`/`e_sharpen`/colour adjusts/`e_grayscale`) | Medium | Common effects work; vignette/pixelate/cartoonify/replace_color/fade/improve all deferred to `Image` upstream. |
+| Effects (`b_`/`e_blur`/`e_sharpen`/colour adjusts/`e_grayscale`/`e_replace_color`) | Medium | Common effects plus `e_replace_color` work; vignette/pixelate/cartoonify/fade/improve still deferred to `Image` upstream. |
 | Geometry (`a_`/`bo_`) | Medium | `a_` 90-multiples only; `r_` and `o_` not implemented. |
 | Overlays (`l_`) | Partial | Base layer form only. |
-| Colour-space (`cs_`) | None | Deferred to `Image` upstream. |
+| Colour-space (`cs_`) | High | Named colorspaces (`srgb`, `tinysrgb`, `cmyk`, `no_cmyk`) supported; arbitrary ICC profiles deferred. |
 | Signed URLs | Full | Wire-format-compatible with Cloudinary's hosted service (SHA-256 / 32 url-safe-base64 chars). |
 
 ## Reporting gaps

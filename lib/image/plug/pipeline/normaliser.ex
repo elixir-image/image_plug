@@ -35,13 +35,22 @@ defmodule Image.Plug.Pipeline.Normaliser do
   6. `%Adjust{}` — Sharp's "modulate" stage. Runs after geometry
      so the new pixels participate in tone shifts.
 
-  7. `%Blur{}` — Sharp explicitly runs blur before sharpen.
+  7. `%Colorspace{}` — runs after `%Adjust{}` (whose multipliers
+     expect RGB) and before `%ReplaceColor{}` (whose chroma-key
+     match operates on the post-conversion bytes).
 
-  8. `%Sharpen{}`.
+  8. `%ReplaceColor{}` — colour-substitution. Runs after Adjust so
+     tone shifts on the source colour have already settled, and
+     before the sigma-based ops so blur/sharpen operate on the
+     post-replace pixels.
 
-  9. `%Draw{}` — composite layers go on top of the finished base.
+  9. `%Blur{}` — Sharp explicitly runs blur before sharpen.
 
-  10. `%Pipeline.Ops.Segment{}` — placeholder; ordered last for now.
+  10. `%Sharpen{}`.
+
+  11. `%Draw{}` — composite layers go on top of the finished base.
+
+  12. `%Pipeline.Ops.Segment{}` — placeholder; ordered last for now.
 
   ### Cardinality
 
@@ -51,7 +60,8 @@ defmodule Image.Plug.Pipeline.Normaliser do
   pipeline-builder gets the same guarantee:
 
   * `Resize`, `Trim`, `Flip`, `Rotate`, `Background`, `Border`,
-    `Adjust`, `Sharpen`, `Blur`, `Segment`.
+    `Adjust`, `Colorspace`, `ReplaceColor`, `Sharpen`, `Blur`,
+    `Segment`.
 
   `Draw` may appear at most once but holds an arbitrary list of
   layers internally, so multiple overlay requests collapse onto
@@ -100,6 +110,8 @@ defmodule Image.Plug.Pipeline.Normaliser do
     {Ops.Flip, 50},
     {Ops.Border, 60},
     {Ops.Adjust, 70},
+    {Ops.Colorspace, 72},
+    {Ops.ReplaceColor, 75},
     {Ops.Blur, 80},
     {Ops.Sharpen, 90},
     {Ops.Draw, 100},
@@ -117,6 +129,8 @@ defmodule Image.Plug.Pipeline.Normaliser do
     Ops.Flip,
     Ops.Border,
     Ops.Adjust,
+    Ops.Colorspace,
+    Ops.ReplaceColor,
     Ops.Blur,
     Ops.Sharpen,
     Ops.Draw,

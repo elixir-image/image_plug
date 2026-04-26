@@ -162,6 +162,24 @@ defmodule Image.Plug.Pipeline.Interpreter do
     end
   end
 
+  # ---------- Colorspace ----------
+
+  defp apply_op(%Ops.Colorspace{target: target}, image, _options) do
+    case Image.to_colorspace(image, target) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("colorspace", reason)}
+    end
+  end
+
+  # ---------- ReplaceColor ----------
+
+  defp apply_op(%Ops.ReplaceColor{} = replace, image, _options) do
+    case Image.replace_color(image, replace_color_options(replace)) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("replace_color", reason)}
+    end
+  end
+
   # ---------- Border ----------
 
   defp apply_op(%Ops.Border{} = border, image, _options) do
@@ -336,6 +354,27 @@ defmodule Image.Plug.Pipeline.Interpreter do
       end
 
     {x, y}
+  end
+
+  # ---------- ReplaceColor helpers ----------
+
+  defp replace_color_options(%Ops.ReplaceColor{
+         to: to,
+         from: from,
+         threshold: threshold,
+         less_than: less_than,
+         greater_than: greater_than,
+         blend?: blend?
+       }) do
+    base = [replace_with: to, blend: blend?]
+
+    cond do
+      not is_nil(less_than) and not is_nil(greater_than) ->
+        [{:less_than, less_than}, {:greater_than, greater_than} | base]
+
+      true ->
+        [{:color, from}, {:threshold, threshold} | base]
+    end
   end
 
   # ---------- Border helpers ----------

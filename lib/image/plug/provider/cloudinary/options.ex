@@ -88,6 +88,18 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
     "auto" => :auto
   }
 
+  # Cloudinary's `cs_<value>` accepts a small set of named
+  # colorspaces. Map them to the atoms `Image.to_colorspace/2`
+  # accepts. `tinysrgb` is Cloudinary-specific (size-optimised
+  # sRGB); we map to plain `:srgb` since the tinification is a
+  # Cloudinary product layer, not a colorspace.
+  @cs_to_target %{
+    "srgb" => :srgb,
+    "tinysrgb" => :srgb,
+    "no_cmyk" => :srgb,
+    "cmyk" => :cmyk
+  }
+
   @unsupported_effects %{
     "vignette" => "cloudinary `e_vignette` needs a vignette helper in the Image library — see TODO.md",
     "pixelate" => "cloudinary `e_pixelate` needs a pixelate helper in the Image library — see TODO.md",
@@ -96,6 +108,9 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
     "replace_color" => "cloudinary `e_replace_color` needs a colour-replace helper in the Image library — see TODO.md",
     "fade" => "cloudinary `e_fade` needs an alpha-gradient helper in the Image library — see TODO.md",
     "improve" => "cloudinary `e_improve` needs an enhance helper in the Image library — see TODO.md",
+    # `replace_color` is supported via `apply_effect/3` below; the
+    # entry stays out of this map so the dispatch lands in the
+    # specific clause rather than the unsupported fallback.
     "auto_brightness" => "cloudinary `e_auto_brightness` needs an enhance helper in the Image library — see TODO.md",
     "auto_color" => "cloudinary `e_auto_color` needs an enhance helper in the Image library — see TODO.md",
     "auto_contrast" => "cloudinary `e_auto_contrast` needs an enhance helper in the Image library — see TODO.md",
@@ -103,8 +118,40 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
     "sepia" => "cloudinary `e_sepia` needs a sepia helper in the Image library — see TODO.md"
   }
 
+  # Cloudinary CSS colour name forms accept underscores between
+  # multi-word names (e.g. `misty_rose`) and lowercase hex without a
+  # leading `#`. We pass both through verbatim — the Image library's
+  # `Image.replace_color/2` accepts hex strings (`"#abcdef"`), CSS
+  # names (string or atom), 0..255 integers, and RGB lists.
+  defp normalise_replace_color_value("rgb:" <> hex), do: "#" <> hex
+
+  defp normalise_replace_color_value(value) when is_binary(value) do
+    cond do
+      hex_color?(value) -> "#" <> value
+      true -> value
+    end
+  end
+
+  defp hex_color?(value) when byte_size(value) in [3, 6, 8] do
+    String.match?(value, ~r/^[0-9a-fA-F]+$/)
+  end
+
+  defp hex_color?(_value), do: false
+
+  # Re-join consecutive `["rgb", "<hex>"]` pairs that an outer
+  # colon-split has separated. `["rgb", "abcdef", "50", "rgb", "fedcba"]`
+  # → `["rgb:abcdef", "50", "rgb:fedcba"]`.
+  defp glue_rgb([]), do: []
+
+  defp glue_rgb(["rgb", hex | rest]) do
+    ["rgb:" <> hex | glue_rgb(rest)]
+  end
+
+  defp glue_rgb([head | rest]) do
+    [head | glue_rgb(rest)]
+  end
+
   @unsupported_keys %{
-    "cs" => "cloudinary `cs_` (colour-space conversion) needs a colorspace helper in the Image library — see TODO.md",
     "t" => "cloudinary named transformations (`t_<name>`) are server-side aliases not modelled by the IR",
     "u" => "cloudinary underlay `u_` is not implemented in v0.1",
     "if" => "cloudinary conditional transforms (`if_...`) are not implemented in v0.1",
@@ -221,6 +268,8 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
       find_one(acc.appended, Ops.Background),
       find_one(acc.appended, Ops.Border),
       acc.adjust,
+      find_one(acc.appended, Ops.Colorspace),
+      find_one(acc.appended, Ops.ReplaceColor),
       find_one(acc.appended, Ops.Sharpen),
       find_one(acc.appended, Ops.Blur),
       acc.draw_layer
@@ -437,6 +486,23 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
 
   defp apply_entry("fl", value, _acc, _strict?), do: {:error, invalid("fl", value)}
 
+  # Colorspace -------------------------------------------------------
+
+  defp apply_entry("cs", value, acc, _strict?) do
+    case Map.fetch(@cs_to_target, value) do
+      {:ok, target} ->
+        op = %Ops.Colorspace{target: target}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error,
+         Error.new(:unsupported_option,
+           "cloudinary `cs_#{value}` not implemented (Adobe RGB and other ICC profiles need a `colorspace/3` helper that accepts ICC strings — see TODO.md)",
+           details: %{key: "cs", value: value}
+         )}
+    end
+  end
+
   # Overlays ---------------------------------------------------------
 
   defp apply_entry("l", value, acc, _strict?) when is_binary(value) and value != "" do
@@ -502,6 +568,39 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   defp apply_effect(grayscale, _, acc) when grayscale in ~w(grayscale greyscale) do
     adjust = ensure_adjust(acc.adjust) |> Map.put(:saturation, 0.0)
     {:ok, %{acc | adjust: adjust}}
+  end
+
+  # Cloudinary `e_replace_color:<to>[:<tolerance>[:<from>]]`. Default
+  # `<from>` is `:auto` (the average of the top-left 10×10 region of
+  # the image), default tolerance is 50. Colour values may take the
+  # `rgb:RRGGBB` form which contains its own colon — `glue_rgb/1`
+  # rejoins those before the per-position split.
+  defp apply_effect("replace_color", value, acc) do
+    {to, tolerance, from} =
+      case glue_rgb(String.split(value, ":")) do
+        [to] -> {to, "50", nil}
+        [to, tolerance] -> {to, tolerance, nil}
+        [to, tolerance, from] -> {to, tolerance, from}
+        _ -> {value, "50", nil}
+      end
+
+    with {:ok, threshold} <- parse_non_neg_integer("e_replace_color", tolerance) do
+      op = %Ops.ReplaceColor{
+        to: normalise_replace_color_value(to),
+        from: if(is_nil(from), do: :auto, else: normalise_replace_color_value(from)),
+        threshold: threshold
+      }
+
+      appended =
+        case Enum.find_index(acc.appended, fn existing ->
+               existing.__struct__ == Ops.ReplaceColor
+             end) do
+          nil -> acc.appended ++ [op]
+          index -> List.replace_at(acc.appended, index, op)
+        end
+
+      {:ok, %{acc | appended: appended}}
+    end
   end
 
   defp apply_effect(name, _value, _acc) when is_map_key(@unsupported_effects, name) do
