@@ -68,11 +68,13 @@ See `image_components`'s own README and CHANGELOG for any further follow-ups.
 
 * **Animated-image frame trim** — ImageKit `tr=t-<from>-<to>`. Needs `Image.extract_frames/3` or a pages-by-time-range helper.
 
-* **Face-aware crop / zoom** — needs face detection in `:image` (probably via `:image_vision`). The IR fields exist (`face_zoom`, `gravity: :face`) but the interpreter doesn't act on `face_zoom` yet.
+* ~~**Face-aware crop / zoom** — needs face detection in `:image` (probably via `:image_vision`). The IR fields exist (`face_zoom`, `gravity: :face`) but the interpreter doesn't act on `face_zoom` yet.~~ **Shipped.** `Image.Plug.FaceAware` wraps `Image.FaceDetection.crop_largest/2` (gated behind `Code.ensure_loaded?/1`) and the interpreter pre-crops to the largest face when `gravity: :face` is set. `face_zoom` controls padding (`0` = loose context, `1` = tight crop). `Ops.PixelateFaces` (Cloudinary `e_pixelate_faces`) pixelates only the detected face regions. All face-aware ops fall back gracefully when `:image_vision` is absent.
 
 * **Auto-contrast (content-aware)** — ImageKit `e-contrast` is currently approximated as `Adjust{contrast: 1.1}`. A content-aware version (one of the `enhance/1` family) would be sharper.
 
-* **AI-driven calls** — background removal **shipped in `:image_vision`** as `Image.Background.remove/2` and `Image.Background.mask/2` (BiRefNet-lite via Ortex). To wire ImageKit `e-bgremove` / `e-removedotbg` and Cloudinary `e_background_removal`, add an `Ops.RemoveBackground{}` IR op whose interpreter clause calls `Image.Background.remove/2` (only when `Code.ensure_loaded?(Image.Background)` is true — `:image_vision` is optional). Super-resolution and generative edits remain `:image_vision`-bound or out of scope.
+* **AI-driven background removal** — `Image.Background.remove/2` and `Image.Background.mask/2` ship in `:image_vision` (BiRefNet-lite via Ortex). The wire-up pattern is the same one used for face detection (see `Image.Plug.FaceAware`): an `Ops.RemoveBackground{}` IR op whose interpreter clause delegates to `Image.Background.remove/2` only when `Code.ensure_loaded?(Image.Background)` is true. Maps to ImageKit `e-bgremove` / `e-removedotbg`. Not yet implemented.
+
+* **Other AI-driven calls** — super-resolution, generative edits. Permanent `:image` gap (live in `:image_vision` instead).
 
 ### Notes
 

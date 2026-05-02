@@ -55,7 +55,7 @@ Every option ImageKit documents in [the transformation reference](https://imagek
 | `c-pad_extract` / `cm-pad_extract` | ✅ | Maps to `Resize{fit: :pad}`. |
 | `c-pad_resize` / `cm-pad_resize` | ✅ | Maps to `Resize{fit: :pad}`. |
 | `fo-<position>` | ✅ | `top`, `bottom`, `left`, `right`, `top_left`, etc. → compass gravities. |
-| `fo-face` | ✅ | Face-aware crop. |
+| `fo-face` | ✅ | Face-aware crop via YuNet when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dep is loaded; falls back to libvips' `:attention` saliency crop otherwise. |
 | `fo-auto` | ⚠️ | Maps to libvips' `:entropy` crop; ImageKit's content-aware crop is approximated. |
 | `fo-custom` + `x-<n>` + `y-<n>` | ✅ | 0..1 normalised focal point. |
 
@@ -111,7 +111,7 @@ Every option ImageKit documents in [the transformation reference](https://imagek
 | `ik-t` | ✅ | Used by signing; the verifier rejects after this unix-seconds timestamp. |
 | `t-<name>` | ❌ | Named (server-side alias) transformations not modelled by the IR. Returns `:unsupported_option`. |
 | `ar-<W>-<H>` (aspect-ratio shortcut) | ✅ | When given alongside exactly one of `w`/`h`, derives the other from the ratio. With both `w` and `h` already explicit, `ar-` is a no-op. |
-| `z-<n>` (zoom) | ⚠️ | Parsed and stored on the Resize op (`face_zoom` field). The interpreter does not yet act on it (matches Cloudflare's `face-zoom`); requires face detection in `:image`. |
+| `z-<n>` (zoom) | ⚠️ | Acts on the largest detected face when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dependency is loaded. `0.0` keeps loose context, `1.0` tight-crops to the face bounding box. Without `:image_vision`, the option is parsed but does not affect the output (the regular thumbnail / `fo-` gravity flow still runs). |
 
 ## Behavioural differences
 

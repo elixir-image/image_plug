@@ -101,7 +101,6 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   }
 
   @unsupported_effects %{
-    "pixelate_faces" => "cloudinary `e_pixelate_faces` needs face detection + a pixelate helper — see TODO.md",
     "redeye" => "cloudinary `e_redeye` is not implemented"
   }
 
@@ -262,6 +261,7 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
       find_one(acc.appended, Ops.ReplaceColor),
       find_one(acc.appended, Ops.Posterize),
       find_one(acc.appended, Ops.Pixelate),
+      find_one(acc.appended, Ops.PixelateFaces),
       find_one(acc.appended, Ops.Sharpen),
       find_one(acc.appended, Ops.Blur),
       find_one(acc.appended, Ops.Vignette),
@@ -706,6 +706,20 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   defp apply_effect("pixelate", value, acc) do
     with {:ok, block_size} <- parse_pos_integer("e_pixelate", value) do
       op = %Ops.Pixelate{scale: 1.0 / block_size}
+      {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+    end
+  end
+
+  # `e_pixelate_faces[:N]` — same block-size convention as
+  # `e_pixelate`, but only the regions occupied by detected
+  # faces are pixelated. Requires the optional `:image_vision`
+  # dependency at runtime; without it the interpreter
+  # silently no-ops (returns the source image unchanged).
+  defp apply_effect("pixelate_faces", "", acc), do: apply_effect("pixelate_faces", "5", acc)
+
+  defp apply_effect("pixelate_faces", value, acc) do
+    with {:ok, block_size} <- parse_pos_integer("e_pixelate_faces", value) do
+      op = %Ops.PixelateFaces{scale: 1.0 / block_size}
       {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
     end
   end

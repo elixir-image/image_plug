@@ -258,6 +258,23 @@ defmodule Image.Plug.Pipeline.Interpreter do
     end
   end
 
+  # ---------- PixelateFaces ----------
+  #
+  # Falls back to no-op when `:image_vision` isn't loaded —
+  # users get a normal image (rather than an error) so the
+  # request still succeeds. Document as ⚠️ in the conformance
+  # guides.
+  defp apply_op(%Ops.PixelateFaces{scale: scale}, image, _options) when scale >= 1.0,
+    do: {:ok, image}
+
+  defp apply_op(%Ops.PixelateFaces{scale: scale}, image, _options) do
+    case Image.Plug.FaceAware.pixelate_faces(image, scale) do
+      {:ok, _} = success -> success
+      {:error, :unavailable} -> {:ok, image}
+      {:error, reason} -> {:error, op_error("pixelate_faces", reason)}
+    end
+  end
+
   # ---------- Posterize ----------
 
   defp apply_op(%Ops.Posterize{levels: 256}, image, _options), do: {:ok, image}
@@ -531,13 +548,25 @@ defmodule Image.Plug.Pipeline.Interpreter do
        when not is_nil(width) or not is_nil(height) do
     {target_width, target_height} = resolve_dimensions(resize, image)
     dimensions = "#{target_width}x#{target_height}"
-    options = thumbnail_options(resize)
 
-    case Image.thumbnail(image, dimensions, options) do
+    # Face-aware pre-crop. When the caller asked for
+    # `gravity: :face` and `:image_vision` is loaded, narrow
+    # the source to the largest detected face (with padding
+    # derived from `face_zoom`) before the regular thumbnail
+    # resize pass. The thumbnail then sees a face-centred
+    # region and produces a face-centred thumbnail. Falls
+    # through to the normal flow when face detection isn't
+    # available or no face is detected — the existing
+    # `:attention` saliency crop takes over.
+    {prepared_image, prepared_resize} = maybe_face_aware_precrop(image, resize)
+
+    options = thumbnail_options(prepared_resize)
+
+    case Image.thumbnail(prepared_image, dimensions, options) do
       {:ok, thumbnailed} ->
         thumbnailed
-        |> maybe_compass_crop(resize, target_width, target_height)
-        |> apply_then(&maybe_pad(resize, &1, target_width, target_height))
+        |> maybe_compass_crop(prepared_resize, target_width, target_height)
+        |> apply_then(&maybe_pad(prepared_resize, &1, target_width, target_height))
 
       {:error, reason} ->
         {:error,
@@ -550,6 +579,23 @@ defmodule Image.Plug.Pipeline.Interpreter do
   defp do_resize(_resize, image) do
     {:ok, image}
   end
+
+  # Pre-crop helper. Returns the (possibly narrowed) image
+  # plus the (possibly modified) Resize op.  When the face
+  # crop succeeds we drop the gravity to `:center` so the
+  # downstream thumbnail does a centred resize on the cropped
+  # region rather than re-running attention saliency.
+  defp maybe_face_aware_precrop(image, %Ops.Resize{gravity: :face, face_zoom: face_zoom} = resize) do
+    case Image.Plug.FaceAware.face_crop(image, face_zoom) do
+      {:ok, cropped} ->
+        {cropped, %{resize | gravity: :center}}
+
+      {:error, _reason} ->
+        {image, resize}
+    end
+  end
+
+  defp maybe_face_aware_precrop(image, resize), do: {image, resize}
 
   defp resolve_dimensions(%Ops.Resize{width: width, height: height, dpr: dpr}, image) do
     {source_width, source_height} = {Image.width(image), Image.height(image)}

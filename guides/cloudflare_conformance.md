@@ -45,9 +45,9 @@ Every key Cloudflare documents in [the URL options reference](https://developers
 | `width` (`w`) | ✅ | Positive integer or `auto`. |
 | `height` (`h`) | ✅ | Positive integer. |
 | `fit` | ✅ | `contain`, `cover`, `crop`, `pad`, `scale-down`, `squeeze` — every documented value. |
-| `gravity` (`g`) | ✅ | Named (`auto`/`face`/compass directions) and normalised `XxY` form. |
+| `gravity` (`g`) | ✅ | Named (`auto`/`face`/compass directions) and normalised `XxY` form. `face` uses YuNet via the optional `:image_vision` dep when present; falls back to libvips' `:attention` saliency crop otherwise. |
 | `dpr` | ✅ | Multiplies output dimensions. Cloudflare documents 1..2; we accept up to 3. |
-| `zoom` / `face-zoom` | ⚠️ | Parsed and stored on the IR; the interpreter does not yet act on it. Requests succeed; the option is silently a no-op. |
+| `zoom` / `face-zoom` | ⚠️ | Acts on the largest detected face when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dependency is loaded — `0.0` keeps loose context, `1.0` tight-crops to the bounding box. Without `:image_vision`, falls back to libvips' `:attention` saliency crop (still a sensible result, just not face-aware). |
 
 ### Output / format
 

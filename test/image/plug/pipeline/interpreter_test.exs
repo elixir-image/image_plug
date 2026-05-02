@@ -243,6 +243,51 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
     end
   end
 
+  describe "Resize gravity: :face — no :image_vision" do
+    @describetag :face_aware
+
+    test "falls back to :attention saliency crop when Image.FaceDetection is absent",
+         %{image: image} do
+      # The wire-up is gated at runtime via
+      # `Code.ensure_loaded?(Image.FaceDetection)`. When the
+      # optional dep is missing, `gravity: :face` should
+      # complete the resize via the saliency fallback rather
+      # than erroring.
+      if Code.ensure_loaded?(Image.FaceDetection) do
+        :skipped
+      else
+        pipeline =
+          Pipeline.new()
+          |> Pipeline.append(%Ops.Resize{
+            width: 200,
+            height: 200,
+            fit: :cover,
+            gravity: :face
+          })
+
+        assert {:ok, resized} = Interpreter.execute(pipeline, image)
+        assert Image.width(resized) <= 200
+        assert Image.height(resized) <= 200
+      end
+    end
+  end
+
+  describe "PixelateFaces" do
+    test "no-ops when :image_vision isn't loaded", %{image: image} do
+      if Code.ensure_loaded?(Image.FaceDetection) do
+        :skipped
+      else
+        pipeline =
+          Pipeline.new()
+          |> Pipeline.append(%Ops.PixelateFaces{scale: 0.05})
+
+        # Without face detection, the op silently returns the
+        # input unchanged — so the request still succeeds.
+        assert {:ok, _result} = Interpreter.execute(pipeline, image)
+      end
+    end
+  end
+
   describe "IccTransform" do
     test "applies a built-in profile via Image.to_colorspace/3", %{image: image} do
       pipeline =

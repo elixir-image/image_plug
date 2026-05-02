@@ -131,6 +131,7 @@ defmodule Image.Plug.Pipeline.Normaliser do
     # Pixel-domain effects.
     {Ops.Posterize, 76},
     {Ops.Pixelate, 77},
+    {Ops.PixelateFaces, 78},
     {Ops.Blur, 80},
     {Ops.Sharpen, 90},
     {Ops.Draw, 100},
@@ -164,6 +165,7 @@ defmodule Image.Plug.Pipeline.Normaliser do
     Ops.ReplaceColor,
     Ops.Posterize,
     Ops.Pixelate,
+    Ops.PixelateFaces,
     Ops.Blur,
     Ops.Sharpen,
     Ops.Draw,

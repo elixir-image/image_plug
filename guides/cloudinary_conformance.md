@@ -57,7 +57,7 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | `c_pad` / `c_lpad` / `c_mpad` / `c_fill_pad` | ✅ | Maps to `Resize{fit: :pad}`. |
 | `c_imagga_crop` / `c_imagga_scale` | ⚠️ | Approximated as `:cover` / `:squeeze`; the AI-driven crop selection is not implemented. |
 | `g_<position>` | ✅ | `north`, `south`, `east`, `west`, `north_east`, etc. → compass gravities. |
-| `g_face` / `g_faces` | ✅ | Face-aware crop. |
+| `g_face` / `g_faces` | ✅ | Face-aware crop via YuNet when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dep is loaded; falls back to libvips' `:attention` saliency crop otherwise. |
 | `g_auto` / `g_auto:subject` / `g_auto:classic` | ⚠️ | All map to libvips' `:entropy` crop; the content-aware variants are approximated. |
 | `g_xy_center` + `x_<n>` + `y_<n>` | ✅ | 0..1 normalised focal point. |
 
@@ -86,7 +86,7 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | `e_sepia` / `e_sepia:<n>` | ✅ | `<n>` is `0..100` strength percentage (default `100`). Wraps `Image.sepia/2`. |
 | `e_vignette` / `e_vignette:<n>` | ✅ | `<n>` is `0..100` strength percentage (default `50`). Wraps `Image.vignette/2`. |
 | `e_pixelate` / `e_pixelate:<n>` | ✅ | `<n>` is the block size in pixels (default `5`). Wraps `Image.pixelate/2`. |
-| `e_pixelate_faces` | ❌ | Needs face detection. |
+| `e_pixelate_faces` / `e_pixelate_faces:<n>` | ⚠️ | Detects faces and pixelates only those regions when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dependency is loaded. Without `:image_vision`, the op silently no-ops (request still succeeds, image returned unchanged). `<n>` is the block size in pixels (default `5`). |
 | `e_cartoonify` / `e_cartoonify:<level_count>` | ✅ | `level_count` is `2..256` (default `5`). Approximated via `Image.posterize/2`; Cloudinary's edge-detect overlay isn't modelled. |
 | `e_replace_color:<to>[:<tolerance>[:<from>]]` | ✅ | Wraps `Image.replace_color/2`. Defaults: `<from>` = `:auto` (top-left 10×10 average), `<tolerance>` = 50. Colours accept hex (`ffffff`), `rgb:RRGGBB` form, and CSS names. |
 | `e_fade` / `e_fade:<n>` | ✅ | `<n>` is the fade length as a `0..100` percentage of the bottom edge (default `20`). Wraps `Image.fade/2` with `edges: [:bottom]`. Cloudinary's directional flavours (`e_fade_top` etc.) aren't modelled. |

@@ -7,15 +7,17 @@ defmodule Image.Plug.VariantStore.ETSTest do
   setup do
     # Each test gets a fresh table + GenServer to keep state isolated
     # without colliding with the application-level singleton.
+    # `start_supervised!/1` registers the process under ExUnit's
+    # test supervisor — teardown is automatic and race-free
+    # (vs. the `on_exit + GenServer.stop` pattern, which can
+    # crash with `:noproc` when the linked GenServer dies with
+    # the test process before `on_exit/1` runs).
     table = :"variants_test_#{System.unique_integer([:positive])}"
     name = :"#{table}_server"
 
-    {:ok, pid} =
-      Image.Plug.VariantStore.ETS.Server.start_link(name: name, table: table, seed: [])
-
-    on_exit(fn ->
-      if Process.alive?(pid), do: GenServer.stop(pid)
-    end)
+    start_supervised!(
+      {Image.Plug.VariantStore.ETS.Server, name: name, table: table, seed: []}
+    )
 
     %{table: table, server: name}
   end

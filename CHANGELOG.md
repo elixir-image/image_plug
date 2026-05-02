@@ -32,6 +32,8 @@ Requires `:image` `~> 0.67`.
 
 * **Mask & alpha** — vignette (`Image.vignette/2`); fade (`Image.fade/2`); rounded corners via SVG mask (`Image.rounded/2`); drop shadow (`Image.drop_shadow/2`); mid-pipeline opacity (`Image.opacity/2`).
 
+* **Face-aware crop & pixelation** — `Resize{gravity: :face}` (Cloudflare `g=face`, imgix `fit=facearea` / `crop=faces`, Cloudinary `g_face`, ImageKit `fo-face`) pre-crops to the most prominent detected face when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dependency is loaded. `face_zoom` (Cloudflare `face-zoom`, ImageKit `z-`) controls how much context surrounds the face. `Ops.PixelateFaces` (Cloudinary `e_pixelate_faces`) pixelates only the face regions. Without `:image_vision`, face-aware ops fall back to libvips' `:attention` saliency crop or no-op silently — the wire-up never errors on missing dependency.
+
 * **Overlays** — `Draw` op with multi-layer composition; per-layer source resolution, sizing, rotation, and positioning.
 
 * **Output format** — JPEG (baseline + progressive), PNG, WebP, AVIF, JSON (metadata endpoint), `:auto` (Accept-driven negotiation). Per-format encoder flags: `:lossy`, `:progressive`, `:chroma_subsampling`. Selective EXIF preservation via `metadata=:copyright` (preserves copyright + orientation through the strip).

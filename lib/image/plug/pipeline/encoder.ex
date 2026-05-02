@@ -275,11 +275,19 @@ defmodule Image.Plug.Pipeline.Encoder do
     # the live `orientation` header before minimisation and
     # restore it after so an explicit `or=N`-driven override
     # survives the metadata strip.
+    #
+    # `Image.minimize_metadata/2` calls `Image.exif/1`, which
+    # returns `{:error, %Image.Error{reason: :invalid_exif}}`
+    # on images whose EXIF blob is TIFF-formatted but missing
+    # the `"Exif\\0\\0"` prefix (some PNGs from libpng's older
+    # `iTXt` paths land here). Treat any failure as "leave
+    # metadata alone" so a malformed source doesn't 500 the
+    # request.
     orientation = read_live_orientation(image)
 
     case Image.minimize_metadata(image, keep: [:copyright, :orientation]) do
       {:ok, prepared} -> restore_orientation(prepared, orientation)
-      other -> other
+      {:error, _} -> {:ok, image}
     end
   rescue
     _ -> {:ok, image}

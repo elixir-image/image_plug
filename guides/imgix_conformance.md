@@ -44,7 +44,7 @@ Every option imgix documents in [the rendering reference](https://docs.imgix.com
 | `fit=clip` | ✅ | Maps to `Resize{fit: :contain}`. |
 | `fit=clamp` | ⚠️ | Should extend edge pixels into the padded area; we currently treat as `:contain`. Real visual difference; landing in a follow-up. |
 | `fit=crop` | ✅ | + `crop=` for position. |
-| `fit=facearea` | ✅ | Maps to face-aware crop via gravity `:face`. |
+| `fit=facearea` | ✅ | Face-aware crop via YuNet when the optional [`:image_vision`](https://hex.pm/packages/image_vision) dep is loaded; falls back to libvips' `:attention` saliency crop otherwise. |
 | `fit=fill` | ✅ | Maps to `Resize{fit: :pad}`; combine with `bg=`. |
 | `fit=fillmax` | ✅ | Two-step: resize down then pad. |
 | `fit=max` | ✅ | Never upscale. |
