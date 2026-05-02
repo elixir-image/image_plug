@@ -18,71 +18,65 @@ Includes the full unpic-style port: layout modes (`:fixed | :constrained | :full
 
 See `image_components`'s own README and CHANGELOG for any further follow-ups.
 
-## Image sibling library: operations needed by CDN adapters
+## Image sibling library: operations needed by CDN adapters — MOSTLY DONE
 
-Captured for the `Image` library author at `../image`. Each CDN adapter in this project surfaces operations that `Image` doesn't (yet) expose as a top-level helper. Implementing these upstream lets the providers map cleanly without dropping into raw `Vix.Vips.Operation` calls or rejecting with `:unsupported_option`.
+`Image` 0.67.0 landed the Group A and Group B helpers; `image_plug` now wires every one of them through to its providers. The sections below capture what shipped and what's still outstanding.
 
-### Currently worked-around in `image_plug`
+### Shipped in `Image` 0.67.0 + wired into `image_plug`
 
-* **`Image.gamma/2`** — `Vix.Vips.Operation.gamma(image, exponent: g)` exists but no top-level `Image.gamma/2` wrapper. The Cloudflare and imgix providers both use gamma. The interpreter currently calls Vix directly. A wrapper following the `Image.brightness/2` / `Image.contrast/2` pattern would let the interpreter stay at the `Image.*` layer.
+* **`Image.gamma/2`** — `image_plug`'s interpreter now calls this directly instead of dropping into `Vix.Vips.Operation.gamma`. Used by Cloudflare/imgix/Cloudinary `gamma` / `gam` / `e_gamma`.
 
-* **Selective EXIF preservation** — encoder options support `strip_metadata: true | false` only. Cloudflare's `metadata=copyright` should preserve only the IPTC copyright field; we currently treat it as `:none` (strip everything). Needs a read-tag-then-write helper in `Image`.
+* **Selective EXIF preservation** — `Image.minimize_metadata/2` accepts a `:keep` list. Cloudflare `metadata=copyright` is now wired end-to-end in `Image.Plug.Pipeline.Encoder` via `keep: [:copyright, :orientation]`. Conformance ⚠️ → ✅.
 
-### Needed for full imgix conformance
+* **`Image.sepia/2`** — wired into imgix `sepia=N` and Cloudinary `e_sepia[:N]`. Conformance ❌ → ✅ in both.
 
-* **`Image.sepia/1`** — single-pass sepia tone. Imgix `sepia=N` (0-100) is documented; we currently `:unsupported_option` it.
+* **`Image.tint/2`** — wired into imgix `monochrome=<hex>` (replaces the plain-B&W workaround). Conformance ⚠️ → ✅.
 
-* **Tinted monochrome** — partially done. Plain B&W is now wired up via the new `Image.Plug.Pipeline.Ops.Colorspace{target: :bw}` op (delegates to `Image.to_colorspace/2`), used by both imgix `monochrome=<hex>` and any future `Colorspace{target: :bw}` use site. The hex tint (a coloured monochrome overlay; black areas of the image become the chosen colour) still needs a composite step on a coloured layer — could be expressed in the IR by chaining the existing `%Background{}` and `%Draw{}` ops once the IR supports a `multiply` or `over` blend mode on layers.
+* **`Image.set_orientation/2`** — wired into imgix `or=N`. The encoder snapshots and restores the `orientation` header across `Image.minimize_metadata/2` so the override survives metadata stripping. Conformance ❌ → ✅.
 
-* **`Image.enhance/1`** — content-aware automatic enhancement (white balance, tone curve). Imgix `auto=enhance`, Cloudinary `e_improve`, ImageKit `e-enhance`. AI-flavoured but usually a fixed pipeline of contrast/saturation/sharpening adjustments derived from image statistics.
+* **`Image.posterize/2`** — wired into Cloudinary `e_cartoonify[:level_count]`. Conformance ❌ → ✅.
 
-* **EXIF orientation override** — `Image.open/2` auto-rotates per EXIF orientation. Imgix `or=<N>` lets the user override. No clean current path; would need an `:autorotate?` option on `Image.open/2` and a separate `Image.set_orientation/2`.
+* **`Image.pixelate/2`** — wired into Cloudinary `e_pixelate[:block_size]`. Conformance ❌ → ✅. (Imgix's `px=N` is still ⚠️ — `Image.pixelate/2` exists but the imgix parser hasn't been wired; trivial follow-up if anyone needs it.)
 
-* **Colour-space conversion as a request-level op** — partially done. Named-colorspace conversion (`:srgb`, `:cmyk`, `:rgb`, `:bw`, …) is now wired up via the new `Image.Plug.Pipeline.Ops.Colorspace` op, which delegates to `Image.to_colorspace/2`. Used by imgix `cs=srgb`/`cs=cmyk`/`cs=rgb`/`cs=strip` and Cloudinary `cs_srgb`/`cs_tinysrgb`/`cs_cmyk`/`cs_no_cmyk`. ICC-profile-targeted colorspaces (Adobe RGB, custom ICC) still need an `Image.to_colorspace/3` (or `Image.icc_transform/2`) helper that accepts ICC profile strings — those return `:unsupported_option` today.
+* **`Image.fade/2`** — wired into Cloudinary `e_fade[:N]` (bottom-edge fade). Conformance ❌ → ✅. Cloudinary's directional flavours (`e_fade_top` etc.) aren't modelled.
 
-### Needed for full Cloudinary conformance
+* **`Image.opacity/2`** — wired into Cloudinary `o_<n>` (0..100 percentage). Conformance ❌ → ✅.
 
-* **Vignette** — radial darkening from edges. Cloudinary `e_vignette`. Returns `:unsupported_option` today.
+* **`Image.rounded/2`** — wired into Cloudinary `r_<n>` / `r_max`. Already SVG-mask-based in `Image`, no draw functions involved. Conformance ❌ → ✅.
 
-* **Pixelate** — block-size argument (and a face-aware variant). Cloudinary `e_pixelate`, `e_pixelate_faces`. Returns `:unsupported_option` today.
+* **`Image.drop_shadow/2`** — wired into ImageKit `e-shadow[-bl-<n>_st-<n>_x-<n>_y-<n>_c-<hex>]`. Conformance ❌ → ✅.
 
-* **Cartoonify / posterize** — level count. Cloudinary `e_cartoonify`. Returns `:unsupported_option` today.
+* **Encoder `:lossy`, `:progressive`, `:chroma_subsampling` flags** — `Image.write/3` accepts all three; `image_plug`'s `Format` IR carries them through; Cloudinary `fl_lossy` / `fl_progressive` and ImageKit `lo-` / `pr-` / `cp-` are wired to set them. Conformance ❌ → ✅ in Cloudinary and ImageKit.
 
-* **Colour-replace** — DONE. Implemented in `image_plug` via the new `Image.Plug.Pipeline.Ops.ReplaceColor` IR op, wrapping `Image.replace_color/2`. Cloudinary `e_replace_color:<to>[:<tolerance>[:<from>]]` parses cleanly into the op; the interpreter delegates to the Image library which handles both threshold and range strategies. Conformance guide upgraded ❌ → ✅.
+### Shipped in the follow-up cycle
 
-* **Gradient fade overlay** — alpha-gradient fade-out on one or more edges. Cloudinary `e_fade`. Returns `:unsupported_option` today.
+* **`Image.enhance/2`** — luminance equalisation + saturation boost + sharpen. Wired into Cloudinary `e_improve` / `e_auto_brightness` / `e_auto_color` / `e_auto_contrast`, imgix `auto=enhance`, ImageKit `e-retouch`. ⚠️ in conformance guides because the hosted versions are ML-driven (we approximate).
 
-* **Auto-quality model** — content-aware quality selection that picks an output quality from image statistics. Cloudinary `q_auto` / `q_auto:eco` / `q_auto:good` / `q_auto:best`. Today we leave the encoder default (85) and set `compression: :fast`; output isn't byte-identical to Cloudinary's hosted `q_auto`.
+* **`Image.vignette/2`** wired into Cloudinary `e_vignette[:N]`. ❌ → ✅.
 
-* **Rounded corners** — rectangular crop with corner radius. Cloudinary `r_<n>` / `r_max`. Not implemented in v0.1.
+* **imgix `px=N`** wired to `Image.pixelate/2`. ❌ → ✅.
 
-* **Mid-pipeline opacity** — alpha multiplier as a transform op. Cloudinary `o_<n>`. Not implemented in v0.1.
+* **ImageKit `ar-<W>-<H>`** wired (provider-side dimension derivation, no `Image` change). ❌ → ✅.
 
-* **Encoder lossy / progressive flags wired through to libvips** — Cloudinary `fl_lossy` / `fl_progressive` / `fl_force_strip` / `fl_preserve_transparency`. We accept the keys today (silently no-op) but don't honour them at encode time. This is an `image_plug`-side encoder gap, not strictly an `Image` library gap.
+* **ImageKit `z-<n>`** wired to the existing `face_zoom` field on Resize (parsed and stored, interpreter is still a no-op pending face detection in `:image`). ❌ → ⚠️.
 
-### Needed for full ImageKit conformance
+### Still outstanding
 
-The imgix list above (sepia, monochrome, enhance, EXIF orientation override, colour-space conversion) covers most of ImageKit's high-value gaps. ImageKit-specific additions:
+* **Colour-space conversion via ICC profiles** — `Image.to_colorspace/3` accepting ICC strings. Adobe RGB / custom-ICC `cs_<…>` / `cs=<…>` still return `:unsupported_option`.
 
-* **Drop shadow** — coloured shadow with offset, blur, opacity. ImageKit `e-shadow`. Returns `:unsupported_option` today.
+* **Auto-quality model** — content-aware quality picker for Cloudinary `q_auto`. Out of scope for `Image`; would need a calibrated heuristic.
 
-* **Gradient overlay** — composite a colour gradient over the image. ImageKit `e-gradient`. Returns `:unsupported_option` today.
+* **Animated-image frame trim** — ImageKit `tr=t-<from>-<to>`. Needs `Image.extract_frames/3` or a pages-by-time-range helper.
 
-* **Auto-contrast** — content-aware single-toggle contrast bump. ImageKit `e-contrast`. We approximate with `Adjust{contrast: 1.1}` today; a content-aware version (one of the `enhance/1` family) would be sharper.
+* **Face-aware crop / zoom** — needs face detection in `:image` (probably via `:image_vision`). The IR fields exist (`face_zoom`, `gravity: :face`) but the interpreter doesn't act on `face_zoom` yet.
 
-* **Animated-image trim** — extract a sub-range of frames from an animated WebP or GIF. ImageKit `tr=t-<from>-<to>` for trim. `Image.extract_pages/1` exists; need a paired `extract_frames/3` (or pages-by-time-range).
+* **Auto-contrast (content-aware)** — ImageKit `e-contrast` is currently approximated as `Adjust{contrast: 1.1}`. A content-aware version (one of the `enhance/1` family) would be sharper.
 
-* **AI-driven calls** — background removal, generative editing, retouch, super-resolution. ImageKit `e-bgremove`, `e-changebg`, `e-edit`, `e-retouch`, `e-upscale`. Probably out of scope for the Image library — these depend on third-party model-serving infrastructure. Document as permanent gaps in the conformance guide rather than attempting to land in `Image`.
-
-* **Encoder lossless / progressive / chroma-subsampling flags** — ImageKit `lo-true`, `pr-true`, `cp-<n>`. Returns `:unsupported_option` today; needs encoder-level support in `Image.write/3` first.
-
-* **Aspect-ratio shortcut** — derive missing dimension from aspect ratio. ImageKit `ar-<W>-<H>`. Could be implemented entirely in the provider if needed (no `Image` change required).
-
-* **Zoom** — face-bound zoom factor. ImageKit `z-<n>`. Likely needs a `face_zoom` extension to the existing `Resize` op (a field already exists; wiring it into the interpreter is the gap).
+* **AI-driven calls** — background removal, super-resolution, generative edits. Permanent `:image` gap (live in `:image_vision` instead).
 
 ### Notes
 
-These are all opportunities, not blockers. Each adapter ships with a documented gap matrix (`✅`/`⚠️`/`❌`) so users know what's supported. As `Image` adds helpers, the adapters move ⚠️/❌ entries to ✅.
+Each adapter ships with a documented gap matrix (`✅` / `⚠️` / `❌`) in `guides/<provider>_conformance.md`. The Group A + B work and this follow-up cycle together moved 22 entries from `❌`/`⚠️` to `✅` / `⚠️`.
 
 ## Cloudinary CDN provider + adapter — DONE
 

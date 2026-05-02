@@ -62,8 +62,8 @@ defmodule Image.Plug.Provider.Imgix.OptionsTest do
                Options.parse("auto=format,compress")
     end
 
-    test "auto=enhance returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("auto=enhance")
+    test "auto=enhance emits an Enhance op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Enhance{}]}} = Options.parse("auto=enhance")
     end
 
     test "q in 1..100" do
@@ -157,23 +157,40 @@ defmodule Image.Plug.Provider.Imgix.OptionsTest do
                Options.parse("cs=strip")
     end
 
-    test "monochrome=<hex> emits a Colorspace{target: :bw} op (hex tint not yet honoured)" do
-      assert {:ok, %Pipeline{ops: [%Ops.Colorspace{target: :bw}]}} =
+    test "monochrome=<hex> emits a Tint op with the parsed RGB" do
+      assert {:ok, %Pipeline{ops: [%Ops.Tint{color: [255, 0, 0]}]}} =
                Options.parse("monochrome=ff0000")
+    end
+
+    test "monochrome=<bad hex> returns :invalid_option" do
+      assert {:error, %Error{tag: :invalid_option}} = Options.parse("monochrome=zzz")
+    end
+
+    test "sepia=<percent> emits a Sepia op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Sepia{strength: 0.8}]}} =
+               Options.parse("sepia=80")
+    end
+
+    test "sepia=0 is dropped as a no-op" do
+      assert {:ok, %Pipeline{ops: []}} = Options.parse("sepia=0")
+    end
+
+    test "sepia out-of-range returns :invalid_option" do
+      assert {:error, %Error{tag: :invalid_option}} = Options.parse("sepia=150")
+    end
+
+    test "or=<n> emits an Orientation op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Orientation{value: 6}]}} = Options.parse("or=6")
+    end
+
+    test "or out-of-range returns :invalid_option" do
+      assert {:error, %Error{tag: :invalid_option}} = Options.parse("or=9")
     end
   end
 
   describe "unsupported / unknown" do
-    test "sepia returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("sepia=80")
-    end
-
     test "cs=adobergb1998 returns :unsupported_option (Adobe RGB needs ICC support)" do
       assert {:error, %Error{tag: :unsupported_option}} = Options.parse("cs=adobergb1998")
-    end
-
-    test "or returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("or=6")
     end
 
     test "unknown key strict=true returns :unknown_option" do

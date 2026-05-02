@@ -76,12 +76,20 @@ defmodule Image.Plug.Integration.CloudinaryTest do
     assert {:ok, _decoded} = Image.from_binary(response.body)
   end
 
-  test "unsupported e_vignette returns 400 :unsupported_option", %{base_url: base_url} do
+  test "e_vignette renders a vignette and returns 200", %{base_url: base_url} do
     {:ok, response} =
-      request("/demo/image/upload/e_vignette/portrait.jpg", base_url: base_url)
+      request("/demo/image/upload/e_vignette,f_jpeg/portrait.jpg", base_url: base_url)
 
-    assert response.status == 400
-    assert response.headers["x-image-plug-error"] == ["unsupported_option"]
+    assert response.status == 200
+    assert {:ok, _decoded} = Image.from_binary(response.body)
+  end
+
+  test "e_improve runs the enhance pipeline and returns 200", %{base_url: base_url} do
+    {:ok, response} =
+      request("/demo/image/upload/e_improve,f_jpeg/portrait.jpg", base_url: base_url)
+
+    assert response.status == 200
+    assert {:ok, _decoded} = Image.from_binary(response.body)
   end
 
   test "unknown key returns 400 :unknown_option", %{base_url: base_url} do

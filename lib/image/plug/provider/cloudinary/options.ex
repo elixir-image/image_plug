@@ -101,21 +101,8 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   }
 
   @unsupported_effects %{
-    "vignette" => "cloudinary `e_vignette` needs a vignette helper in the Image library — see TODO.md",
-    "pixelate" => "cloudinary `e_pixelate` needs a pixelate helper in the Image library — see TODO.md",
     "pixelate_faces" => "cloudinary `e_pixelate_faces` needs face detection + a pixelate helper — see TODO.md",
-    "cartoonify" => "cloudinary `e_cartoonify` needs a posterize helper in the Image library — see TODO.md",
-    "replace_color" => "cloudinary `e_replace_color` needs a colour-replace helper in the Image library — see TODO.md",
-    "fade" => "cloudinary `e_fade` needs an alpha-gradient helper in the Image library — see TODO.md",
-    "improve" => "cloudinary `e_improve` needs an enhance helper in the Image library — see TODO.md",
-    # `replace_color` is supported via `apply_effect/3` below; the
-    # entry stays out of this map so the dispatch lands in the
-    # specific clause rather than the unsupported fallback.
-    "auto_brightness" => "cloudinary `e_auto_brightness` needs an enhance helper in the Image library — see TODO.md",
-    "auto_color" => "cloudinary `e_auto_color` needs an enhance helper in the Image library — see TODO.md",
-    "auto_contrast" => "cloudinary `e_auto_contrast` needs an enhance helper in the Image library — see TODO.md",
-    "redeye" => "cloudinary `e_redeye` is not implemented",
-    "sepia" => "cloudinary `e_sepia` needs a sepia helper in the Image library — see TODO.md"
+    "redeye" => "cloudinary `e_redeye` is not implemented"
   }
 
   # Cloudinary CSS colour name forms accept underscores between
@@ -268,10 +255,19 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
       find_one(acc.appended, Ops.Background),
       find_one(acc.appended, Ops.Border),
       acc.adjust,
+      find_one(acc.appended, Ops.Enhance),
       find_one(acc.appended, Ops.Colorspace),
+      find_one(acc.appended, Ops.Sepia),
+      find_one(acc.appended, Ops.Tint),
       find_one(acc.appended, Ops.ReplaceColor),
+      find_one(acc.appended, Ops.Posterize),
+      find_one(acc.appended, Ops.Pixelate),
       find_one(acc.appended, Ops.Sharpen),
       find_one(acc.appended, Ops.Blur),
+      find_one(acc.appended, Ops.Vignette),
+      find_one(acc.appended, Ops.Fade),
+      find_one(acc.appended, Ops.Rounded),
+      find_one(acc.appended, Ops.Opacity),
       acc.draw_layer
     ]
     |> Enum.reject(&is_nil/1)
@@ -325,6 +321,18 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
       _ -> {:error, invalid(key, value)}
     end
   end
+
+  # Range-bounded integer parser. Returns `{:ok, n}` or `:error`
+  # without wrapping in a typed error so callers can produce
+  # context-specific messages.
+  defp parse_int_in_range_value(value, range) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} -> if n in range, do: {:ok, n}, else: :error
+      _ -> :error
+    end
+  end
+
+  defp parse_int_in_range_value(_value, _range), do: :error
 
   defp parse_unit_float(key, value) when is_binary(value) do
     case Float.parse(value) do
@@ -481,10 +489,49 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   end
 
   defp apply_entry("fl", "preserve_transparency", acc, _strict?), do: {:ok, acc}
-  defp apply_entry("fl", "progressive", acc, _strict?), do: {:ok, acc}
-  defp apply_entry("fl", "lossy", acc, _strict?), do: {:ok, acc}
+
+  defp apply_entry("fl", "progressive", acc, _strict?) do
+    {:ok, %{acc | output: %{acc.output | progressive: true}}}
+  end
+
+  defp apply_entry("fl", "lossy", acc, _strict?) do
+    {:ok, %{acc | output: %{acc.output | lossy: true}}}
+  end
 
   defp apply_entry("fl", value, _acc, _strict?), do: {:error, invalid("fl", value)}
+
+  # Rounded corners ----------------------------------------------------
+  #
+  # Cloudinary `r_<n>` — n is the corner radius in pixels.
+  # `r_max` produces a fully circular / pill-shaped result.
+  defp apply_entry("r", "max", acc, _strict?) do
+    op = %Ops.Rounded{radius: :max}
+    {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+  end
+
+  defp apply_entry("r", value, acc, _strict?) do
+    with {:ok, n} <- parse_pos_integer("r", value) do
+      op = %Ops.Rounded{radius: n}
+      {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+    end
+  end
+
+  # Mid-pipeline opacity -----------------------------------------------
+  #
+  # Cloudinary `o_<n>` — n is a 0..100 opacity percentage.
+  defp apply_entry("o", value, acc, _strict?) do
+    case parse_int_in_range_value(value, 0..100) do
+      {:ok, 100} ->
+        {:ok, acc}
+
+      {:ok, percent} ->
+        op = %Ops.Opacity{factor: percent / 100}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("o", value)}
+    end
+  end
 
   # Colorspace -------------------------------------------------------
 
@@ -600,6 +647,100 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
         end
 
       {:ok, %{acc | appended: appended}}
+    end
+  end
+
+  # `e_improve` and the `e_auto_*` family map to `Image.enhance/2`,
+  # a sensible-defaults stack of luminance equalisation +
+  # saturation boost + mild sharpen. Cloudinary's hosted versions
+  # are ML-driven; we approximate.
+  defp apply_effect(name, _value, acc)
+       when name in ~w(improve auto_brightness auto_color auto_contrast) do
+    op = %Ops.Enhance{}
+    {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+  end
+
+  # `e_vignette[:N]` — N is 0..100 strength percentage. Default
+  # is `50` (matches `Image.vignette/2`'s `:strength` default).
+  defp apply_effect("vignette", "", acc), do: apply_effect("vignette", "50", acc)
+
+  defp apply_effect("vignette", value, acc) do
+    case parse_int_in_range_value(value, 0..100) do
+      {:ok, 0} ->
+        {:ok, acc}
+
+      {:ok, n} ->
+        op = %Ops.Vignette{strength: n / 100}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("e_vignette", value)}
+    end
+  end
+
+  # `e_sepia[:N]` — N is 0..100 strength percentage. Default
+  # full sepia when no value is given.
+  defp apply_effect("sepia", "", acc), do: apply_effect("sepia", "100", acc)
+
+  defp apply_effect("sepia", value, acc) do
+    case parse_int_in_range_value(value, 0..100) do
+      {:ok, 0} ->
+        {:ok, acc}
+
+      {:ok, n} ->
+        op = %Ops.Sepia{strength: n / 100}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("e_sepia", value)}
+    end
+  end
+
+  # `e_pixelate[:N]` — N is the block size in pixels. Default
+  # block size 5 when no value is given.
+  defp apply_effect("pixelate", "", acc), do: apply_effect("pixelate", "5", acc)
+
+  defp apply_effect("pixelate", value, acc) do
+    with {:ok, block_size} <- parse_pos_integer("e_pixelate", value) do
+      op = %Ops.Pixelate{scale: 1.0 / block_size}
+      {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+    end
+  end
+
+  # `e_cartoonify[:level_count]` — `level_count` defaults to
+  # `5`. We map straight through to `Image.posterize/2`'s
+  # tonal-quantisation; Cloudinary's full effect also adds an
+  # edge-detect overlay we don't model.
+  defp apply_effect("cartoonify", "", acc), do: apply_effect("cartoonify", "5", acc)
+
+  defp apply_effect("cartoonify", value, acc) do
+    case parse_int_in_range_value(value, 2..256) do
+      {:ok, levels} ->
+        op = %Ops.Posterize{levels: levels}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("e_cartoonify", value)}
+    end
+  end
+
+  # `e_fade[:N]` — N is a 0..100 length percentage applied to
+  # the bottom edge by default (matches Cloudinary's documented
+  # default). Cloudinary's directional flavours
+  # (`e_fade_top` etc.) aren't modelled in v0.1.
+  defp apply_effect("fade", "", acc), do: apply_effect("fade", "20", acc)
+
+  defp apply_effect("fade", value, acc) do
+    case parse_int_in_range_value(value, 0..100) do
+      {:ok, 0} ->
+        {:ok, acc}
+
+      {:ok, percent} ->
+        op = %Ops.Fade{edges: [:bottom], length: percent / 100}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("e_fade", value)}
     end
   end
 

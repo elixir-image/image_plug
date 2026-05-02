@@ -55,7 +55,7 @@ Every key Cloudflare documents in [the URL options reference](https://developers
 | --- | --- | --- |
 | `quality` (`q`) | ✅ | `1..100` or named (`high`, `medium-high`, `medium-low`, `low`). |
 | `format` (`f`) | ✅ | `auto`, `avif`, `webp`, `jpeg`, `baseline-jpeg`, `json`, plus `png` (we add this; Cloudflare emits PNG only via source-format pass-through). |
-| `metadata` | ⚠️ | Parsed; M2 currently treats `:copyright` the same as `:none` (strips everything). Selective copyright preservation is a pending follow-up. |
+| `metadata` | ✅ | `keep` preserves all EXIF; `none` strips everything; `copyright` (default) preserves copyright + orientation via `Image.minimize_metadata/2`. |
 | `anim` | ⚠️ | Parsed and stored on the IR; encoder does not yet act on it. Animated WebP/GIF inputs always emit a single frame in v0.1. |
 | `compression` | ⚠️ | `fast` is parsed and stored; encoder does not yet wire it through to libvips' speed knobs. |
 | `slow-connection-quality` (`scq`) | ⚠️ | Parsed and stored; we do not yet inspect the `Save-Data` request header to choose between `quality` and `scq_quality`. |

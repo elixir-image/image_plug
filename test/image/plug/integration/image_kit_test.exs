@@ -57,12 +57,14 @@ defmodule Image.Plug.Integration.ImageKitTest do
     assert response.status == 200
   end
 
-  test "unsupported e-shadow returns 400 :unsupported_option", %{base_url: base_url} do
+  test "e-shadow renders a drop shadow and returns 200", %{base_url: base_url} do
     {:ok, response} =
-      request("/tr:e-shadow/portrait.jpg", base_url: base_url)
+      request("/tr:e-shadow-bl-8_st-50,f-png/portrait.jpg", base_url: base_url)
 
-    assert response.status == 400
-    assert response.headers["x-image-plug-error"] == ["unsupported_option"]
+    assert response.status == 200
+    {:ok, decoded} = Image.from_binary(response.body)
+    # Drop shadow always emits an alpha channel (the silhouette).
+    assert Image.has_alpha?(decoded)
   end
 
   test "unknown key returns 400 :unknown_option", %{base_url: base_url} do

@@ -213,12 +213,18 @@ defmodule Image.Plug.Provider.Cloudinary.OptionsTest do
   end
 
   describe "unsupported / unknown" do
-    test "e_vignette returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("e_vignette")
+    test "e_vignette emits a Vignette op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Vignette{strength: 0.5}]}} =
+               Options.parse("e_vignette")
     end
 
-    test "e_pixelate returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("e_pixelate:30")
+    test "e_vignette:30 emits a Vignette op with the parsed strength" do
+      assert {:ok, %Pipeline{ops: [%Ops.Vignette{strength: 0.3}]}} =
+               Options.parse("e_vignette:30")
+    end
+
+    test "e_improve emits an Enhance op" do
+      assert {:ok, %Pipeline{ops: [%Ops.Enhance{}]}} = Options.parse("e_improve")
     end
 
     test "cs_<unsupported> returns :unsupported_option" do

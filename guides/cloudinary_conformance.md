@@ -70,7 +70,9 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | `f_jpg` / `f_jpe` / `f_jpeg` / `f_png` / `f_webp` / `f_avif` | ✅ | |
 | `f_auto` | ✅ | Same Accept-driven negotiation as the other providers. |
 | `f_jp2` | ❌ | We don't encode JPEG 2000. Returns `:invalid_option`. |
-| `fl_force_strip` / `fl_progressive` / `fl_lossy` / `fl_preserve_transparency` | ⚠️ | Recognised and silently accepted; the encoder doesn't yet wire these flags through to libvips. |
+| `fl_force_strip` / `fl_preserve_transparency` | ⚠️ | Recognised and silently accepted (force-strip is implicit when `metadata=:none`; preserve-transparency is implicit on RGBA pipelines). |
+| `fl_progressive` | ✅ | Sets `Format.progressive = true`; threaded through to libvips on JPEG / PNG output. |
+| `fl_lossy` | ✅ | Sets `Format.lossy = true`; threaded through to libvips on WebP (lossless = false), AVIF (lossless = false), and PNG (palette quantisation). |
 
 ### Effects
 
@@ -81,13 +83,14 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | `e_sharpen:<n>` | ✅ | 0..100; `sigma = N / 10`. |
 | `e_brightness:<n>` / `e_contrast:<n>` / `e_saturation:<n>` / `e_gamma:<n>` | ✅ | -100..100 mapped to multiplier `1.0 + N/100`. |
 | `e_grayscale` / `e_greyscale` | ✅ | Approximated as `Adjust{saturation: 0}`. |
-| `e_sepia` | ❌ | Needs a `sepia/1` helper in the Image library — returns `:unsupported_option`. |
-| `e_vignette` | ❌ | Needs a vignette helper — returns `:unsupported_option`. |
-| `e_pixelate` / `e_pixelate_faces` | ❌ | Needs a pixelate helper — returns `:unsupported_option`. |
-| `e_cartoonify` | ❌ | Needs a posterize helper — returns `:unsupported_option`. |
+| `e_sepia` / `e_sepia:<n>` | ✅ | `<n>` is `0..100` strength percentage (default `100`). Wraps `Image.sepia/2`. |
+| `e_vignette` / `e_vignette:<n>` | ✅ | `<n>` is `0..100` strength percentage (default `50`). Wraps `Image.vignette/2`. |
+| `e_pixelate` / `e_pixelate:<n>` | ✅ | `<n>` is the block size in pixels (default `5`). Wraps `Image.pixelate/2`. |
+| `e_pixelate_faces` | ❌ | Needs face detection. |
+| `e_cartoonify` / `e_cartoonify:<level_count>` | ✅ | `level_count` is `2..256` (default `5`). Approximated via `Image.posterize/2`; Cloudinary's edge-detect overlay isn't modelled. |
 | `e_replace_color:<to>[:<tolerance>[:<from>]]` | ✅ | Wraps `Image.replace_color/2`. Defaults: `<from>` = `:auto` (top-left 10×10 average), `<tolerance>` = 50. Colours accept hex (`ffffff`), `rgb:RRGGBB` form, and CSS names. |
-| `e_fade` | ❌ | Needs a gradient overlay helper — returns `:unsupported_option`. |
-| `e_improve` / `e_auto_brightness` / `e_auto_color` / `e_auto_contrast` | ❌ | Needs an enhance helper — returns `:unsupported_option`. |
+| `e_fade` / `e_fade:<n>` | ✅ | `<n>` is the fade length as a `0..100` percentage of the bottom edge (default `20`). Wraps `Image.fade/2` with `edges: [:bottom]`. Cloudinary's directional flavours (`e_fade_top` etc.) aren't modelled. |
+| `e_improve` / `e_auto_brightness` / `e_auto_color` / `e_auto_contrast` | ⚠️ | All four map to `Image.enhance/2`, a sensible-defaults stack of luminance equalisation + saturation boost + mild sharpen. Cloudinary's hosted versions are ML-driven; output is visually similar but not byte-identical. |
 | `e_redeye` | ❌ | Returns `:unsupported_option`. |
 
 ### Geometry
@@ -97,8 +100,8 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | `a_<n>` | ⚠️ | Cloudinary accepts arbitrary integer; we accept multiples of 90 only (libvips constraint without expensive rotation). |
 | `a_auto_right` / `a_auto_left` / `a_vflip` / `a_hflip` | ❌ | Compound rotation modes not implemented. |
 | `bo_<W>px_solid_<color>` | ✅ | Uniform-width border. Per-side border not supported in Cloudinary's grammar. |
-| `r_<n>` / `r_max` | ❌ | Rounded corners not implemented in v0.1. |
-| `o_<n>` (opacity) | ❌ | Mid-pipeline opacity not implemented in v0.1. |
+| `r_<n>` / `r_max` | ✅ | `n` is the corner radius in pixels; `r_max` produces a fully circular / pill-shaped result (radius = half the shorter dimension). Wraps `Image.rounded/2` (SVG-mask based). |
+| `o_<n>` (opacity) | ✅ | `n` is `0..100` opacity percentage. Wraps `Image.opacity/2`; adds an opaque alpha band when missing. |
 
 ### Overlays
 

@@ -75,8 +75,6 @@ defmodule Image.Plug.Provider.ImageKit.Options do
   }
 
   @unsupported_effects %{
-    "shadow" =>
-      "imagekit `e-shadow` needs a drop-shadow helper in the Image library — see TODO.md",
     "gradient" =>
       "imagekit `e-gradient` needs a gradient overlay helper in the Image library — see TODO.md",
     "removedotbg" =>
@@ -86,8 +84,6 @@ defmodule Image.Plug.Provider.ImageKit.Options do
     "changebg" =>
       "imagekit `e-changebg` is a generative-AI call; not implemented",
     "edit" => "imagekit `e-edit` is a generative-AI call; not implemented",
-    "retouch" =>
-      "imagekit `e-retouch` needs an enhance helper in the Image library — see TODO.md",
     "upscale" =>
       "imagekit `e-upscale` is a model-driven super-resolution call; not implemented"
   }
@@ -95,12 +91,7 @@ defmodule Image.Plug.Provider.ImageKit.Options do
   @unsupported_keys %{
     "ot" => "imagekit overlay-text (`ot-`) is not implemented in v0.1",
     "obg" => "imagekit overlay-background (`obg-`) is not implemented in v0.1",
-    "lo" => "imagekit lossless mode (`lo-`) is not modelled by the encoder yet",
-    "pr" => "imagekit progressive flag (`pr-`) is not modelled by the encoder yet",
-    "cp" => "imagekit chroma subsampling (`cp-`) is not modelled by the encoder yet",
-    "t" => "imagekit named transformation (`t-`) is a server-side alias not modelled by the IR",
-    "ar" => "imagekit aspect-ratio shortcut (`ar-`) is not implemented in v0.1",
-    "z" => "imagekit zoom (`z-`) is not implemented in v0.1"
+    "t" => "imagekit named transformation (`t-`) is a server-side alias not modelled by the IR"
   }
 
   @doc """
@@ -168,7 +159,8 @@ defmodule Image.Plug.Provider.ImageKit.Options do
          output: %Ops.Format{},
          draw_layer: nil,
          appended: [],
-         focal_point: %{x: nil, y: nil}
+         focal_point: %{x: nil, y: nil},
+         aspect_ratio: nil
        }}
 
     entries
@@ -187,9 +179,31 @@ defmodule Image.Plug.Provider.ImageKit.Options do
     pipeline =
       Pipeline.new(provider: Image.Plug.Provider.ImageKit)
       |> Pipeline.put_output(acc.output)
-      |> append_in_canonical_order(apply_focal_point(acc))
+      |> append_in_canonical_order(acc |> apply_aspect_ratio() |> apply_focal_point())
 
     {:ok, pipeline}
+  end
+
+  # When `ar-W-H` was specified along with exactly one of `w`/`h`,
+  # derive the missing dimension from the ratio. When both are
+  # already set, the user has been explicit; leave them alone.
+  # When neither is set, `ar` alone is a no-op (ImageKit's docs
+  # say `ar` only takes effect with one of `w`/`h`).
+  defp apply_aspect_ratio(%{aspect_ratio: nil} = acc), do: acc
+
+  defp apply_aspect_ratio(%{aspect_ratio: {w_part, h_part}, resize: resize} = acc) do
+    case resize do
+      %Ops.Resize{width: w, height: nil} when is_integer(w) ->
+        derived = max(round(w * h_part / w_part), 1)
+        %{acc | resize: %{resize | height: derived}}
+
+      %Ops.Resize{width: nil, height: h} when is_integer(h) ->
+        derived = max(round(h * w_part / h_part), 1)
+        %{acc | resize: %{resize | width: derived}}
+
+      _ ->
+        acc
+    end
   end
 
   defp apply_focal_point(
@@ -213,8 +227,10 @@ defmodule Image.Plug.Provider.ImageKit.Options do
       find_one(acc.appended, Ops.Background),
       find_one(acc.appended, Ops.Border),
       acc.adjust,
+      find_one(acc.appended, Ops.Enhance),
       find_one(acc.appended, Ops.Sharpen),
       find_one(acc.appended, Ops.Blur),
+      find_one(acc.appended, Ops.DropShadow),
       acc.draw_layer
     ]
     |> Enum.reject(&is_nil/1)
@@ -262,6 +278,91 @@ defmodule Image.Plug.Provider.ImageKit.Options do
     end
   end
 
+  # Range-bounded integer parser. Returns `{:ok, n}` or `:error`
+  # without wrapping in a typed error so callers can produce
+  # context-specific messages.
+  defp parse_int_in_range_value(value, range) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} -> if n in range, do: {:ok, n}, else: :error
+      _ -> :error
+    end
+  end
+
+  defp parse_int_in_range_value(_value, _range), do: :error
+
+  # Parses ImageKit's `e-shadow` parameter string. Format is
+  # any combination of `bl-<n>` (blur radius), `st-<n>`
+  # (strength / opacity 0..100), `x-<n>` (dx pixels),
+  # `y-<n>` (dy pixels), `c-<hex>` (colour), separated by
+  # underscores. Order is not significant; missing components
+  # use the defaults from `%Ops.DropShadow{}`. A bare
+  # `e-shadow` returns the default struct.
+  @shadow_defaults %{color: [0, 0, 0], opacity: 0.5, sigma: 5.0, dx: 0, dy: 10}
+
+  defp parse_shadow_params("") do
+    {:ok, @shadow_defaults}
+  end
+
+  defp parse_shadow_params(value) when is_binary(value) do
+    pairs = parse_shadow_pairs(value)
+
+    Enum.reduce_while(pairs, {:ok, @shadow_defaults}, fn {key, val}, {:ok, acc} ->
+      case apply_shadow_pair(key, val, acc) do
+        {:ok, _} = success -> {:cont, success}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Each component is `<key>-<value>`; the components are joined
+  # by `_`. The negative-number-friendly split below drops empty
+  # tokens introduced by ImageKit's `y--3` syntax (which means
+  # "y = -3", not "y = (no value), then -3").
+  defp parse_shadow_pairs(value) do
+    value
+    |> String.split("_", trim: true)
+    |> Enum.map(fn token ->
+      case String.split(token, "-", parts: 2) do
+        [key, val] -> {key, val}
+        [key] -> {key, ""}
+      end
+    end)
+  end
+
+  defp apply_shadow_pair("bl", val, acc) do
+    case parse_int_in_range_value(val, 0..100) do
+      {:ok, n} -> {:ok, %{acc | sigma: max(n / 2.0, 0.5)}}
+      :error -> {:error, invalid("e-shadow:bl", val)}
+    end
+  end
+
+  defp apply_shadow_pair("st", val, acc) do
+    case parse_int_in_range_value(val, 0..100) do
+      {:ok, n} -> {:ok, %{acc | opacity: n / 100.0}}
+      :error -> {:error, invalid("e-shadow:st", val)}
+    end
+  end
+
+  defp apply_shadow_pair("x", val, acc) do
+    with {:ok, n} <- parse_int("e-shadow:x", val), do: {:ok, %{acc | dx: n}}
+  end
+
+  defp apply_shadow_pair("y", val, acc) do
+    with {:ok, n} <- parse_int("e-shadow:y", val), do: {:ok, %{acc | dy: n}}
+  end
+
+  defp apply_shadow_pair("c", val, acc) do
+    case Color.new(val) do
+      {:ok, %Color.SRGB{r: r, g: g, b: b}} ->
+        {:ok, %{acc | color: [round(r * 255), round(g * 255), round(b * 255)]}}
+
+      _ ->
+        {:error, invalid("e-shadow:c", val)}
+    end
+  end
+
+  defp apply_shadow_pair(_key, _val, acc), do: {:ok, acc}
+
   defp parse_int(key, value) when is_binary(value) do
     case Integer.parse(value) do
       {integer, ""} -> {:ok, integer}
@@ -288,6 +389,37 @@ defmodule Image.Plug.Provider.ImageKit.Options do
   defp apply_entry("h", value, acc, _strict?) do
     with {:ok, integer} <- parse_pos_integer("h", value) do
       {:ok, %{acc | resize: ensure_resize(acc.resize) |> Map.put(:height, integer)}}
+    end
+  end
+
+  # ImageKit `ar-W-H` — sets the target aspect ratio. Only
+  # takes effect when exactly one of `w`/`h` is also given.
+  defp apply_entry("ar", value, acc, _strict?) do
+    case String.split(value, "-", parts: 2) do
+      [w_str, h_str] ->
+        with {:ok, w_part} <- parse_pos_integer("ar", w_str),
+             {:ok, h_part} <- parse_pos_integer("ar", h_str) do
+          {:ok, %{acc | aspect_ratio: {w_part, h_part}}}
+        end
+
+      _ ->
+        {:error, invalid("ar", value)}
+    end
+  end
+
+  # ImageKit `z-<n>` — face-zoom factor in `[0.0, 1.0]`. Stored
+  # on the IR's Resize op (`face_zoom` field); the interpreter
+  # does not yet act on it (matches Cloudflare's `face-zoom`
+  # behaviour). Parsed so users with `z-` in URLs aren't
+  # rejected.
+  defp apply_entry("z", value, acc, _strict?) do
+    case Float.parse(value) do
+      {f, ""} when f >= 0.0 and f <= 1.0 ->
+        resize = ensure_resize(acc.resize) |> Map.put(:face_zoom, f)
+        {:ok, %{acc | resize: resize}}
+
+      _ ->
+        {:error, invalid("z", value)}
     end
   end
 
@@ -340,6 +472,50 @@ defmodule Image.Plug.Provider.ImageKit.Options do
     case Map.fetch(@f_to_atom, value) do
       {:ok, atom} -> {:ok, %{acc | output: %{acc.output | type: atom}}}
       :error -> {:error, invalid("f", value)}
+    end
+  end
+
+  # Encoder flags ----------------------------------------------------
+  #
+  # ImageKit `lo-true` — lossless mode (WebP / AVIF / PNG only).
+  defp apply_entry("lo", "true", acc, _strict?) do
+    {:ok, %{acc | output: %{acc.output | lossy: false}}}
+  end
+
+  defp apply_entry("lo", "false", acc, _strict?) do
+    {:ok, %{acc | output: %{acc.output | lossy: true}}}
+  end
+
+  defp apply_entry("lo", value, _acc, _strict?), do: {:error, invalid("lo", value)}
+
+  # ImageKit `pr-true` — progressive JPEG.
+  defp apply_entry("pr", "true", acc, _strict?) do
+    {:ok, %{acc | output: %{acc.output | progressive: true}}}
+  end
+
+  defp apply_entry("pr", "false", acc, _strict?) do
+    {:ok, %{acc | output: %{acc.output | progressive: false}}}
+  end
+
+  defp apply_entry("pr", value, _acc, _strict?), do: {:error, invalid("pr", value)}
+
+  # ImageKit `cp-<n>` — chroma subsampling. `1` (4:1:1 / 4:2:0)
+  # is the typical low-bandwidth setting; `0` selects libvips'
+  # auto behaviour. Values `2`/`3` (4:2:2 / 4:4:4) collapse to
+  # `:off` (force full chroma).
+  defp apply_entry("cp", value, acc, _strict?) do
+    case parse_int_in_range_value(value, 0..3) do
+      {:ok, 0} ->
+        {:ok, %{acc | output: %{acc.output | chroma_subsampling: :auto}}}
+
+      {:ok, 1} ->
+        {:ok, %{acc | output: %{acc.output | chroma_subsampling: :on}}}
+
+      {:ok, _} ->
+        {:ok, %{acc | output: %{acc.output | chroma_subsampling: :off}}}
+
+      :error ->
+        {:error, invalid("cp", value)}
     end
   end
 
@@ -497,6 +673,31 @@ defmodule Image.Plug.Provider.ImageKit.Options do
   defp apply_effect(grayscale, _, acc) when grayscale in ~w(grayscale greyscale) do
     adjust = ensure_adjust(acc.adjust) |> Map.put(:saturation, 0.0)
     {:ok, %{acc | adjust: adjust}}
+  end
+
+  # ImageKit `e-retouch` maps to `Image.enhance/2`. The hosted
+  # version is ML-driven; we approximate.
+  defp apply_effect("retouch", _value, acc) do
+    op = %Ops.Enhance{}
+    {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+  end
+
+  # ImageKit `e-shadow` accepts an optional dash-separated tuple
+  # of `bl-<blur>-st-<strength>-x-<dx>-y-<dy>-c-<hex>` (in any
+  # order) per the ImageKit docs. Bare `e-shadow` uses sensible
+  # defaults; missing components fall back to the same defaults.
+  defp apply_effect("shadow", value, acc) do
+    with {:ok, params} <- parse_shadow_params(value) do
+      op = %Ops.DropShadow{
+        color: params.color,
+        opacity: params.opacity,
+        sigma: params.sigma,
+        dx: params.dx,
+        dy: params.dy
+      }
+
+      {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+    end
   end
 
   defp apply_effect(name, _value, _acc) when is_map_key(@unsupported_effects, name) do

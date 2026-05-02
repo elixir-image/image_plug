@@ -82,11 +82,10 @@ defmodule Image.Plug.Provider.Imgix.Options do
     "hv" => :both
   }
 
-  @unsupported_keys %{
-    "sepia" => "imgix `sepia=` requires a sepia helper in the Image library — see TODO.md",
-    "or" => "imgix `or=` (EXIF orientation override) needs the Image library to expose orientation control — see TODO.md",
-    "px" => "imgix `px=` (pixelate) needs a pixelate helper in the Image library — see TODO.md"
-  }
+  # Empty in the current build — every imgix option that maps
+  # cleanly is now wired. Kept as a named map so future imgix
+  # additions can land in one place if a parser is deferred.
+  @unsupported_keys %{}
 
   # imgix's `cs=<value>` accepts a small set of named colorspaces.
   # Map them to the atoms `Image.to_colorspace/2` accepts.
@@ -98,7 +97,6 @@ defmodule Image.Plug.Provider.Imgix.Options do
   }
 
   @unsupported_auto %{
-    "enhance" => "imgix `auto=enhance` needs `Image.enhance/1` — see TODO.md",
     "redeye" => "imgix `auto=redeye` is not implemented",
     "true" => "imgix `auto=true` is unspecified; pass an explicit value like `auto=format,compress`"
   }
@@ -192,6 +190,7 @@ defmodule Image.Plug.Provider.Imgix.Options do
   # in turn mirrors Sharp); the normaliser will re-sort as needed.
   defp append_in_canonical_order(pipeline, acc) do
     [
+      find_one(acc.appended, Ops.Orientation),
       find_one(acc.appended, Ops.Rotate),
       find_one(acc.appended, Ops.Trim),
       find_one(acc.appended, Ops.Flip),
@@ -199,9 +198,19 @@ defmodule Image.Plug.Provider.Imgix.Options do
       find_one(acc.appended, Ops.Background),
       find_one(acc.appended, Ops.Border),
       acc.adjust,
+      find_one(acc.appended, Ops.Enhance),
       find_one(acc.appended, Ops.Colorspace),
+      find_one(acc.appended, Ops.Sepia),
+      find_one(acc.appended, Ops.Tint),
+      find_one(acc.appended, Ops.Posterize),
+      find_one(acc.appended, Ops.Pixelate),
       find_one(acc.appended, Ops.Sharpen),
       find_one(acc.appended, Ops.Blur),
+      find_one(acc.appended, Ops.Vignette),
+      find_one(acc.appended, Ops.Fade),
+      find_one(acc.appended, Ops.Rounded),
+      find_one(acc.appended, Ops.DropShadow),
+      find_one(acc.appended, Ops.Opacity),
       acc.draw_layer
     ]
     |> Enum.reject(&is_nil/1)
@@ -241,6 +250,35 @@ defmodule Image.Plug.Provider.Imgix.Options do
       _ -> {:error, invalid(key, value)}
     end
   end
+
+  # Range-bounded integer parser without the {:error, …} wrapping
+  # used by the existing helpers — callers wrap themselves so they
+  # can vary the error message.
+  defp parse_int_in_range_value(value, range) when is_binary(value) do
+    case Integer.parse(value) do
+      {n, ""} -> if n in range, do: {:ok, n}, else: :error
+      _ -> :error
+    end
+  end
+
+  defp parse_int_in_range_value(_value, _range), do: :error
+
+  # Parses a hex colour into a 3-element `[r, g, b]` 0..255 list.
+  # `Color.new/1` already handles `#abc`, `abc`, `#aabbcc`,
+  # `aabbcc`, and rejects garbage; we just need to scale the
+  # unit-range floats it returns into the 0..255 range stored on
+  # `%Ops.Tint{}` and friends.
+  defp parse_hex_rgb(value) when is_binary(value) do
+    case Color.new(value) do
+      {:ok, %Color.SRGB{r: r, g: g, b: b}} ->
+        {:ok, [round(r * 255), round(g * 255), round(b * 255)]}
+
+      _ ->
+        :error
+    end
+  end
+
+  defp parse_hex_rgb(_), do: :error
 
   defp parse_non_neg_integer(key, value) when is_binary(value) do
     case Integer.parse(value) do
@@ -462,14 +500,62 @@ defmodule Image.Plug.Provider.Imgix.Options do
     end
   end
 
-  # imgix `monochrome=<hex>` is a tinted monochrome (B&W image with a
-  # named colour replacing what would be black). v0.1 ships plain B&W
-  # via `Image.to_colorspace(image, :bw)`; the hex tint is parsed but
-  # not yet applied (would need a composite op on a coloured layer).
-  # Documented as ⚠️ in the conformance guide.
-  defp apply_entry("monochrome", _value, acc, _strict?) do
-    op = %Ops.Colorspace{target: :bw}
-    {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+  # imgix `monochrome=<hex>` produces a tinted monochrome.
+  # `Image.tint/2` does this in one pass via a luminance + tint
+  # colour-recombination matrix.
+  defp apply_entry("monochrome", value, acc, _strict?) do
+    case parse_hex_rgb(value) do
+      {:ok, rgb} ->
+        op = %Ops.Tint{color: rgb}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("monochrome", value)}
+    end
+  end
+
+  # imgix `sepia=N` is `0..100` percentage strength. Maps to
+  # `Image.sepia/2`'s `0.0..1.0` strength via `N / 100`.
+  defp apply_entry("sepia", value, acc, _strict?) do
+    case parse_int_in_range_value(value, 0..100) do
+      {:ok, 0} ->
+        {:ok, acc}
+
+      {:ok, n} ->
+        op = %Ops.Sepia{strength: n / 100}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("sepia", value)}
+    end
+  end
+
+  # imgix `px=N` is the pixelate block size in pixels (1..100).
+  # `Image.pixelate/2` takes a `scale` factor (smaller = chunkier
+  # blocks); we convert via `scale = 1 / N`.
+  defp apply_entry("px", value, acc, _strict?) do
+    case parse_int_in_range_value(value, 1..100) do
+      {:ok, n} ->
+        op = %Ops.Pixelate{scale: 1.0 / n}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("px", value)}
+    end
+  end
+
+  # imgix `or=N` overrides the EXIF orientation tag. `N` is an
+  # integer in the EXIF orientation enumeration (1..8). Maps to
+  # `Image.set_orientation/2`.
+  defp apply_entry("or", value, acc, _strict?) do
+    case parse_int_in_range_value(value, 1..8) do
+      {:ok, n} ->
+        op = %Ops.Orientation{value: n}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+
+      :error ->
+        {:error, invalid("or", value)}
+    end
   end
 
   # Overlays ---------------------------------------------------------
@@ -486,9 +572,12 @@ defmodule Image.Plug.Provider.Imgix.Options do
   end
 
   # Unsupported keys ---------------------------------------------------
-
+  #
+  # `@unsupported_keys` is currently empty. The dispatch clause
+  # below is kept so future deferrals can be added by populating
+  # the map without re-introducing the clause.
   defp apply_entry(key, _value, _acc, _strict?) when is_map_key(@unsupported_keys, key) do
-    {:error, unsupported(key, Map.fetch!(@unsupported_keys, key))}
+    {:error, unsupported(key, @unsupported_keys[key] || "")}
   end
 
   # Unknown keys -----------------------------------------------------
@@ -511,6 +600,14 @@ defmodule Image.Plug.Provider.Imgix.Options do
 
   defp apply_auto_part("compress", acc),
     do: {:ok, %{acc | output: %{acc.output | compression: :fast}}}
+
+  # `auto=enhance` adds an Enhance op (luminance equalisation +
+  # mild saturation + sharpen). Approximation; imgix's hosted
+  # version is ML-driven.
+  defp apply_auto_part("enhance", acc) do
+    op = %Ops.Enhance{}
+    {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+  end
 
   defp apply_auto_part(other, _acc) do
     case Map.fetch(@unsupported_auto, other) do

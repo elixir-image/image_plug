@@ -168,48 +168,135 @@ defmodule Image.Plug.Pipeline.Encoder do
     buffer = Keyword.get(encode_options, :buffer, :stream)
     {suffix, content_type, write_options} = format_settings(format)
 
-    case buffer do
-      :stream ->
-        stream = Image.stream!(image, [{:suffix, suffix} | write_options])
-        {:ok, {:stream, stream}, content_type}
+    case prepare_metadata(image, format.metadata) do
+      {:ok, prepared} ->
+        encode_buffered_or_streamed(prepared, suffix, content_type, write_options, buffer)
 
-      :bytes ->
-        case Image.write(image, :memory, [{:suffix, suffix} | write_options]) do
-          {:ok, bytes} -> {:ok, {:bytes, bytes}, content_type}
-          {:error, reason} -> {:error, encode_error(reason)}
-        end
+      {:error, reason} ->
+        {:error, encode_error(reason)}
     end
   rescue
     e in Image.Error ->
       {:error, encode_error(e)}
   end
 
-  defp format_settings(%Ops.Format{type: :jpeg, quality: q, metadata: m}) do
-    {".jpg", "image/jpeg", [quality: q] ++ strip_metadata_option(m)}
+  defp encode_buffered_or_streamed(image, suffix, content_type, write_options, :stream) do
+    stream = Image.stream!(image, [{:suffix, suffix} | write_options])
+    {:ok, {:stream, stream}, content_type}
   end
 
-  defp format_settings(%Ops.Format{type: :baseline_jpeg, quality: q, metadata: m}) do
-    {".jpg", "image/jpeg", [quality: q, progressive: false] ++ strip_metadata_option(m)}
+  defp encode_buffered_or_streamed(image, suffix, content_type, write_options, :bytes) do
+    case Image.write(image, :memory, [{:suffix, suffix} | write_options]) do
+      {:ok, bytes} -> {:ok, {:bytes, bytes}, content_type}
+      {:error, reason} -> {:error, encode_error(reason)}
+    end
   end
 
-  defp format_settings(%Ops.Format{type: :png, metadata: m}) do
-    {".png", "image/png", strip_metadata_option(m)}
+  defp format_settings(%Ops.Format{type: :jpeg} = f) do
+    {".jpg", "image/jpeg",
+     [quality: f.quality]
+     |> append_progressive(f.progressive)
+     |> append_chroma_subsampling(f.chroma_subsampling)
+     |> append_strip_metadata(f.metadata)}
   end
 
-  defp format_settings(%Ops.Format{type: :webp, quality: q, metadata: m}) do
-    {".webp", "image/webp", [quality: q] ++ strip_metadata_option(m)}
+  defp format_settings(%Ops.Format{type: :baseline_jpeg} = f) do
+    {".jpg", "image/jpeg",
+     [quality: f.quality, progressive: false]
+     |> append_chroma_subsampling(f.chroma_subsampling)
+     |> append_strip_metadata(f.metadata)}
   end
 
-  defp format_settings(%Ops.Format{type: :avif, quality: q, metadata: m}) do
-    {".avif", "image/avif", [quality: q] ++ strip_metadata_option(m)}
+  defp format_settings(%Ops.Format{type: :png} = f) do
+    {".png", "image/png",
+     []
+     |> append_progressive(f.progressive)
+     |> append_lossy(f.lossy)
+     |> append_strip_metadata(f.metadata)}
   end
 
-  defp strip_metadata_option(:keep), do: []
-  defp strip_metadata_option(:none), do: [strip_metadata: true]
-  # In M3 we still strip everything for `:copyright` — selective
-  # copyright preservation needs a small read-then-write helper that
-  # arrives in M6 alongside the rest of the cache-headers/policy work.
-  defp strip_metadata_option(:copyright), do: [strip_metadata: true]
+  defp format_settings(%Ops.Format{type: :webp} = f) do
+    {".webp", "image/webp",
+     [quality: f.quality]
+     |> append_lossy(f.lossy)
+     |> append_strip_metadata(f.metadata)}
+  end
+
+  defp format_settings(%Ops.Format{type: :avif} = f) do
+    {".avif", "image/avif",
+     [quality: f.quality]
+     |> append_lossy(f.lossy)
+     |> append_chroma_subsampling(f.chroma_subsampling)
+     |> append_strip_metadata(f.metadata)}
+  end
+
+  defp append_progressive(opts, nil), do: opts
+  defp append_progressive(opts, value) when is_boolean(value), do: opts ++ [progressive: value]
+
+  defp append_lossy(opts, nil), do: opts
+  defp append_lossy(opts, value) when is_boolean(value), do: opts ++ [lossy: value]
+
+  defp append_chroma_subsampling(opts, nil), do: opts
+
+  defp append_chroma_subsampling(opts, mode) when mode in [:auto, :on, :off],
+    do: opts ++ [chroma_subsampling: mode]
+
+  # `:copyright` metadata is materialised by `prepare_metadata/2`
+  # before encoding (`Image.minimize_metadata/2` rewrites only the
+  # copyright field onto the image), so the encoder asks libvips
+  # to preserve everything that survives.
+  defp append_strip_metadata(opts, :keep), do: opts
+  defp append_strip_metadata(opts, :none), do: opts ++ [strip_metadata: true]
+  defp append_strip_metadata(opts, :copyright), do: opts
+
+  # `:copyright` runs `Image.minimize_metadata/2` with a `:keep`
+  # list so the encoded output retains only the copyright field.
+  # `:keep` and `:none` need no pre-encode mutation — libvips
+  # handles them via the `strip_metadata` write option.
+  defp prepare_metadata(image, :keep), do: {:ok, image}
+  defp prepare_metadata(image, :none), do: {:ok, image}
+
+  # Always preserve orientation alongside copyright — otherwise
+  # an image stored with `EXIF Orientation = 6` would deliver
+  # rotated incorrectly through the plug. Callers who want every
+  # tag stripped (including orientation) should pass
+  # `metadata=:none`.
+  #
+  # `Image.minimize_metadata/2` calls `Image.exif/1` internally,
+  # which raises a `WithClauseError` on certain images whose
+  # EXIF blob is TIFF-formatted but missing the `"Exif\\0\\0"`
+  # prefix. Treat any unexpected failure as "fall back to leaving
+  # metadata alone" so a malformed EXIF blob never breaks the
+  # encode path.
+  defp prepare_metadata(image, :copyright) do
+    # `Image.minimize_metadata/2`'s `:keep` list reads from the
+    # source EXIF blob, but `Image.set_orientation/2` mutates a
+    # live header field that isn't part of that blob. Snapshot
+    # the live `orientation` header before minimisation and
+    # restore it after so an explicit `or=N`-driven override
+    # survives the metadata strip.
+    orientation = read_live_orientation(image)
+
+    case Image.minimize_metadata(image, keep: [:copyright, :orientation]) do
+      {:ok, prepared} -> restore_orientation(prepared, orientation)
+      other -> other
+    end
+  rescue
+    _ -> {:ok, image}
+  end
+
+  defp read_live_orientation(image) do
+    case Vix.Vips.Image.header_value(image, "orientation") do
+      {:ok, n} when is_integer(n) -> n
+      _ -> nil
+    end
+  end
+
+  defp restore_orientation(image, nil), do: {:ok, image}
+
+  defp restore_orientation(image, orientation) when is_integer(orientation) do
+    Image.set_orientation(image, orientation)
+  end
 
   defp pick_auto_format(encode_options) do
     accept = Keyword.get(encode_options, :accept) || ""

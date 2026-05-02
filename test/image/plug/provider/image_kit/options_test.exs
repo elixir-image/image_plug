@@ -132,15 +132,52 @@ defmodule Image.Plug.Provider.ImageKit.OptionsTest do
     end
   end
 
+  describe "encoder flags + drop shadow" do
+    test "e-shadow with no params emits a default DropShadow op" do
+      assert {:ok, %Pipeline{ops: [%Ops.DropShadow{}]}} = Options.parse("e-shadow")
+    end
+
+    test "e-shadow with bl-/st-/x-/y-/c- params populates the DropShadow fields" do
+      assert {:ok,
+              %Pipeline{
+                ops: [
+                  %Ops.DropShadow{
+                    sigma: 4.0,
+                    opacity: 0.4,
+                    dx: 5,
+                    dy: -3,
+                    color: [255, 0, 0]
+                  }
+                ]
+              }} = Options.parse("e-shadow-bl-8_st-40_x-5_y--3_c-ff0000")
+    end
+
+    test "lo-true sets Format.lossy = false (lossless wire format)" do
+      assert {:ok, %Pipeline{output: %{lossy: false}}} = Options.parse("lo-true")
+    end
+
+    test "lo-false sets Format.lossy = true" do
+      assert {:ok, %Pipeline{output: %{lossy: true}}} = Options.parse("lo-false")
+    end
+
+    test "pr-true sets Format.progressive = true" do
+      assert {:ok, %Pipeline{output: %{progressive: true}}} = Options.parse("pr-true")
+    end
+
+    test "cp-1 sets chroma_subsampling = :on (4:2:0)" do
+      assert {:ok, %Pipeline{output: %{chroma_subsampling: :on}}} = Options.parse("cp-1")
+    end
+
+    test "cp-2 sets chroma_subsampling = :off (4:4:4 full chroma)" do
+      assert {:ok, %Pipeline{output: %{chroma_subsampling: :off}}} = Options.parse("cp-2")
+    end
+
+    test "cp-0 sets chroma_subsampling = :auto" do
+      assert {:ok, %Pipeline{output: %{chroma_subsampling: :auto}}} = Options.parse("cp-0")
+    end
+  end
+
   describe "unsupported / unknown" do
-    test "e-shadow returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("e-shadow")
-    end
-
-    test "lo returns :unsupported_option" do
-      assert {:error, %Error{tag: :unsupported_option}} = Options.parse("lo-true")
-    end
-
     test "t- (named transform) returns :unsupported_option" do
       assert {:error, %Error{tag: :unsupported_option}} = Options.parse("t-my_named")
     end

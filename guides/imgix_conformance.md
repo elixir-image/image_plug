@@ -65,7 +65,7 @@ Every option imgix documents in [the rendering reference](https://docs.imgix.com
 | `fm=jp2` | ❌ | We don't encode JPEG 2000. Returns `:invalid_option`. |
 | `auto=format` | ✅ | Same Accept-driven negotiation as the Cloudflare provider. |
 | `auto=compress` | ⚠️ | Sets `Format.compression = :fast` but the encoder doesn't yet wire it through to libvips' speed knobs. |
-| `auto=enhance` | ❌ | Needs an `enhance/1` helper in the Image library — see this project's `TODO.md`. Returns `:unsupported_option`. |
+| `auto=enhance` | ⚠️ | Maps to `Image.enhance/2`, a sensible-defaults stack of luminance equalisation + saturation boost + mild sharpen. Imgix's hosted version is ML-driven; output is visually similar but not byte-identical. |
 | `auto=redeye` | ❌ | Returns `:unsupported_option`. |
 
 ### Effects
@@ -76,9 +76,9 @@ Every option imgix documents in [the rendering reference](https://docs.imgix.com
 | `blur` | ✅ | 0..2000; mapped to libvips sigma via `sigma = N / 100`. |
 | `sharp` | ✅ | 0..100; `sigma = N / 10`. |
 | `bri` / `con` / `sat` / `gam` | ✅ | -100..100 mapped to multiplier `1.0 + N/100`. |
-| `sepia` | ❌ | Needs a `sepia/1` helper in the Image library — returns `:unsupported_option`. |
-| `monochrome=<hex>` | ⚠️ | Produces plain black-and-white via `Image.to_colorspace(:bw)`. The hex tint (a coloured monochrome overlay) is parsed but not yet applied — would need a composite step on a coloured layer. Documented as a follow-up. |
-| `px` (pixelate) | ❌ | Needs a `pixelate/2` helper in the Image library. |
+| `sepia` | ✅ | `0..100` strength percentage mapped to `Image.sepia/2`'s `0.0..1.0` blend factor. |
+| `monochrome=<hex>` | ✅ | Tinted monochrome via `Image.tint/2` — luminance-projected RGB scaled by the hex tint colour. |
+| `px` (pixelate) | ✅ | `1..100` block size in pixels. Wraps `Image.pixelate/2` (`scale = 1 / N`). |
 
 ### Geometry
 
@@ -86,7 +86,7 @@ Every option imgix documents in [the rendering reference](https://docs.imgix.com
 | --- | --- | --- |
 | `flip=h/v/hv` | ✅ | |
 | `rot` | ⚠️ | imgix documents arbitrary integer; we accept multiples of 90 only (libvips constraint without expensive rotation). |
-| `or` (EXIF orientation override) | ❌ | Needs `Image` to expose orientation control. Returns `:unsupported_option`. |
+| `or` (EXIF orientation override) | ✅ | `1..8` per the EXIF orientation enumeration. Maps to `Image.set_orientation/2`; survives the encoder's metadata-strip path. |
 | `trim=auto` | ✅ | Maps to `Trim{mode: :border}`. |
 | `trim=color` + `trimcolor` | ⚠️ | Recognised; the IR's `Trim` op accepts a colour but the interpreter ignores it (auto-detects instead). |
 | `border=W,#hex` | ✅ | Uniform-width border. Per-side border not supported in imgix's grammar. |

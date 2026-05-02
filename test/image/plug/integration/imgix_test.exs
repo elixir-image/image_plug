@@ -41,15 +41,16 @@ defmodule Image.Plug.Integration.ImgixTest do
     assert response.headers["content-type"] == ["image/webp; charset=utf-8"]
   end
 
-  test "monochrome= produces a single-channel image (B&W)", %{base_url: base_url} do
+  test "monochrome=<hex> produces a tinted RGB image", %{base_url: base_url} do
     {:ok, response} = request("/portrait.jpg?monochrome=ff0000&fm=jpeg", base_url: base_url)
 
     assert response.status == 200
     assert response.headers["content-type"] == ["image/jpeg; charset=utf-8"]
 
     {:ok, decoded} = Image.from_binary(response.body)
-    # JPEG decode of a B&W source produces a single-channel image.
-    assert Image.bands(decoded) == 1
+    # Tint preserves the 3-band sRGB shape (it's a colour
+    # recombination, not a colour-space conversion).
+    assert Image.bands(decoded) == 3
   end
 
   test "cs=srgb converts the colorspace and returns valid bytes", %{base_url: base_url} do
@@ -59,11 +60,19 @@ defmodule Image.Plug.Integration.ImgixTest do
     assert {:ok, _decoded} = Image.from_binary(response.body)
   end
 
-  test "unsupported sepia returns 400 :unsupported_option", %{base_url: base_url} do
-    {:ok, response} = request("/portrait.jpg?sepia=80", base_url: base_url)
+  test "sepia=<percent> succeeds and returns a JPEG", %{base_url: base_url} do
+    {:ok, response} = request("/portrait.jpg?sepia=80&fm=jpeg", base_url: base_url)
 
-    assert response.status == 400
-    assert response.headers["x-image-plug-error"] == ["unsupported_option"]
+    assert response.status == 200
+    assert {:ok, _decoded} = Image.from_binary(response.body)
+  end
+
+  test "or=<n> overrides the EXIF orientation tag", %{base_url: base_url} do
+    {:ok, response} = request("/portrait.jpg?or=6&fm=jpeg", base_url: base_url)
+
+    assert response.status == 200
+    {:ok, decoded} = Image.from_binary(response.body)
+    assert {:ok, 6} = Vix.Vips.Image.header_value(decoded, "orientation")
   end
 
   test "unknown key returns 400 :unknown_option", %{base_url: base_url} do

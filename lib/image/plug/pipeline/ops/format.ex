@@ -20,6 +20,7 @@ defmodule Image.Plug.Pipeline.Ops.Format do
 
   @type metadata :: :copyright | :keep | :none
   @type compression :: nil | :fast
+  @type chroma_subsampling :: nil | :auto | :on | :off
 
   @type t :: %__MODULE__{
           type: type(),
@@ -28,7 +29,10 @@ defmodule Image.Plug.Pipeline.Ops.Format do
           anim?: boolean(),
           dpr: pos_integer(),
           compression: compression(),
-          scq_quality: nil | 1..100
+          scq_quality: nil | 1..100,
+          lossy: nil | boolean(),
+          progressive: nil | boolean(),
+          chroma_subsampling: chroma_subsampling()
         }
 
   defstruct type: :auto,
@@ -37,5 +41,8 @@ defmodule Image.Plug.Pipeline.Ops.Format do
             anim?: true,
             dpr: 1,
             compression: nil,
-            scq_quality: nil
+            scq_quality: nil,
+            lossy: nil,
+            progressive: nil,
+            chroma_subsampling: nil
 end

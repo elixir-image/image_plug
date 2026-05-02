@@ -36,7 +36,7 @@ defmodule Image.Plug.MixProject do
   defp deps do
     [
       {:plug, "~> 1.16"},
-      {:image, "~> 0.62"},
+      image_dep(),
       {:vix, "~> 0.38"},
       {:telemetry, "~> 1.2"},
       {:req, "~> 0.5", optional: true},
@@ -53,6 +53,19 @@ defmodule Image.Plug.MixProject do
     "A pluggable Plug-based image server. Maps URLs to a canonical image " <>
       "processing pipeline executed via the Image library, with named, " <>
       "stored variants. Ships a Cloudflare Images URL provider."
+  end
+
+  # Prefer a sibling `../image` checkout during local
+  # development so unpublished work in `:image` is picked up
+  # without needing to publish first. Falls back to the
+  # published version constraint when no sibling checkout
+  # exists, which is the normal case for downstream users.
+  defp image_dep do
+    if File.exists?(Path.join(__DIR__, "../image/mix.exs")) do
+      {:image, path: "../image", override: true}
+    else
+      {:image, "~> 0.67"}
+    end
   end
 
   defp package do

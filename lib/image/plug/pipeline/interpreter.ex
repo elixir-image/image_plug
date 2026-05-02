@@ -186,6 +186,131 @@ defmodule Image.Plug.Pipeline.Interpreter do
     do_border(border, image)
   end
 
+  # ---------- Enhance ----------
+
+  defp apply_op(%Ops.Enhance{}, image, _options) do
+    case Image.enhance(image) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("enhance", reason)}
+    end
+  end
+
+  # ---------- Vignette ----------
+
+  defp apply_op(%Ops.Vignette{strength: +0.0}, image, _options), do: {:ok, image}
+
+  defp apply_op(%Ops.Vignette{strength: strength}, image, _options) do
+    case Image.vignette(image, strength: strength) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("vignette", reason)}
+    end
+  end
+
+  # ---------- Sepia ----------
+
+  defp apply_op(%Ops.Sepia{strength: +0.0}, image, _options), do: {:ok, image}
+
+  defp apply_op(%Ops.Sepia{strength: strength}, image, _options) do
+    case Image.sepia(image, strength) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("sepia", reason)}
+    end
+  end
+
+  # ---------- Tint ----------
+
+  defp apply_op(%Ops.Tint{color: color}, image, _options) do
+    case Image.tint(image, color) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("tint", reason)}
+    end
+  end
+
+  # ---------- Opacity ----------
+
+  defp apply_op(%Ops.Opacity{factor: 1.0}, image, _options), do: {:ok, image}
+
+  defp apply_op(%Ops.Opacity{factor: factor}, image, _options) do
+    case Image.opacity(image, factor) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("opacity", reason)}
+    end
+  end
+
+  # ---------- Pixelate ----------
+
+  defp apply_op(%Ops.Pixelate{scale: scale}, image, _options) when scale >= 1.0,
+    do: {:ok, image}
+
+  defp apply_op(%Ops.Pixelate{scale: scale}, image, _options) do
+    case Image.pixelate(image, scale) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("pixelate", reason)}
+    end
+  end
+
+  # ---------- Posterize ----------
+
+  defp apply_op(%Ops.Posterize{levels: 256}, image, _options), do: {:ok, image}
+
+  defp apply_op(%Ops.Posterize{levels: levels}, image, _options) do
+    case Image.posterize(image, levels) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("posterize", reason)}
+    end
+  end
+
+  # ---------- Rounded ----------
+
+  defp apply_op(%Ops.Rounded{radius: :max}, image, _options) do
+    radius = div(min(Image.width(image), Image.height(image)), 2)
+
+    case Image.rounded(image, radius: radius) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("rounded", reason)}
+    end
+  end
+
+  defp apply_op(%Ops.Rounded{radius: radius}, image, _options) when is_integer(radius) do
+    case Image.rounded(image, radius: radius) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("rounded", reason)}
+    end
+  end
+
+  # ---------- DropShadow ----------
+
+  defp apply_op(%Ops.DropShadow{} = shadow, image, _options) do
+    case Image.drop_shadow(image,
+           color: shadow.color,
+           opacity: shadow.opacity,
+           sigma: shadow.sigma,
+           dx: shadow.dx,
+           dy: shadow.dy
+         ) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("drop_shadow", reason)}
+    end
+  end
+
+  # ---------- Fade ----------
+
+  defp apply_op(%Ops.Fade{edges: edges, length: length}, image, _options) do
+    case Image.fade(image, edges: edges, length: length) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("fade", reason)}
+    end
+  end
+
+  # ---------- Orientation ----------
+
+  defp apply_op(%Ops.Orientation{value: value}, image, _options) do
+    case Image.set_orientation(image, value) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("orientation", reason)}
+    end
+  end
+
   # ---------- Segment (placeholder) ----------
 
   defp apply_op(%Ops.Segment{}, image, _options) do
@@ -269,7 +394,7 @@ defmodule Image.Plug.Pipeline.Interpreter do
   defp apply_gamma(image, multiplier) when multiplier == 1.0, do: {:ok, image}
 
   defp apply_gamma(image, multiplier) do
-    case Vix.Vips.Operation.gamma(image, exponent: multiplier) do
+    case Image.gamma(image, multiplier) do
       {:ok, _} = success -> success
       {:error, reason} -> {:error, op_error("gamma", reason)}
     end

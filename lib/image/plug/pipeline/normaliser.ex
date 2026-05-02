@@ -103,6 +103,11 @@ defmodule Image.Plug.Pipeline.Normaliser do
   # pipeline. The interpreter is a straight reduce; this list is the
   # only place that knows about ordering.
   @order [
+    # Metadata override comes first — `Image.set_orientation/2`
+    # only mutates the EXIF tag and doesn't touch pixels, so its
+    # position relative to other ops is irrelevant; placing it
+    # first keeps the pipeline trace readable.
+    {Ops.Orientation, 5},
     {Ops.Trim, 10},
     {Ops.Background, 20},
     {Ops.Resize, 30},
@@ -110,18 +115,37 @@ defmodule Image.Plug.Pipeline.Normaliser do
     {Ops.Flip, 50},
     {Ops.Border, 60},
     {Ops.Adjust, 70},
+    # Enhance subsumes brightness / contrast / saturation
+    # tweaks but produces a globally normalised image; place
+    # it just after Adjust so user-explicit adjustments still
+    # apply on top.
+    {Ops.Enhance, 71},
     {Ops.Colorspace, 72},
+    # Single-pass colour transforms after Adjust/Colorspace.
+    {Ops.Sepia, 73},
+    {Ops.Tint, 74},
     {Ops.ReplaceColor, 75},
+    # Pixel-domain effects.
+    {Ops.Posterize, 76},
+    {Ops.Pixelate, 77},
     {Ops.Blur, 80},
     {Ops.Sharpen, 90},
     {Ops.Draw, 100},
-    {Ops.Segment, 110}
+    {Ops.Segment, 110},
+    # Mask / silhouette / alpha adjustments come at the end so
+    # they see the fully-rendered colour image.
+    {Ops.Vignette, 195},
+    {Ops.Fade, 200},
+    {Ops.Rounded, 210},
+    {Ops.DropShadow, 220},
+    {Ops.Opacity, 230}
   ]
 
   @order_map Map.new(@order)
 
   # Op kinds that must appear at most once per pipeline.
   @single_instance_ops [
+    Ops.Orientation,
     Ops.Trim,
     Ops.Background,
     Ops.Resize,
@@ -129,12 +153,22 @@ defmodule Image.Plug.Pipeline.Normaliser do
     Ops.Flip,
     Ops.Border,
     Ops.Adjust,
+    Ops.Enhance,
     Ops.Colorspace,
+    Ops.Sepia,
+    Ops.Tint,
     Ops.ReplaceColor,
+    Ops.Posterize,
+    Ops.Pixelate,
     Ops.Blur,
     Ops.Sharpen,
     Ops.Draw,
-    Ops.Segment
+    Ops.Segment,
+    Ops.Vignette,
+    Ops.Fade,
+    Ops.Rounded,
+    Ops.DropShadow,
+    Ops.Opacity
   ]
 
   @doc """
@@ -230,6 +264,11 @@ defmodule Image.Plug.Pipeline.Normaliser do
   end
 
   defp noop?(%Ops.Border{top: 0, right: 0, bottom: 0, left: 0}), do: true
+  defp noop?(%Ops.Sepia{strength: s}) when s in [0, +0.0], do: true
+  defp noop?(%Ops.Vignette{strength: s}) when s in [0, +0.0], do: true
+  defp noop?(%Ops.Opacity{factor: 1.0}), do: true
+  defp noop?(%Ops.Posterize{levels: 256}), do: true
+  defp noop?(%Ops.Pixelate{scale: s}) when s >= 1.0, do: true
 
   defp noop?(%Ops.Trim{mode: :explicit, top: 0, right: 0, bottom: 0, left: 0}), do: true
 

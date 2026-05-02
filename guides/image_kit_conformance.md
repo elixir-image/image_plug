@@ -66,9 +66,9 @@ Every option ImageKit documents in [the transformation reference](https://imagek
 | `q-<n>` | ✅ | 1..100. |
 | `f-jpg` / `f-jpeg` / `f-png` / `f-webp` / `f-avif` | ✅ | |
 | `f-auto` | ✅ | Same Accept-driven negotiation as the other providers. |
-| `lo-true` (lossless) | ❌ | Returns `:unsupported_option`; the encoder doesn't wire a lossless flag through to libvips yet. |
-| `pr-true` (progressive) | ❌ | Returns `:unsupported_option`; progressive JPEG is reachable via `f-pjpg`-style aliases but ImageKit's `pr-` flag isn't modelled. |
-| `cp-<n>` (chroma subsampling) | ❌ | Returns `:unsupported_option`. |
+| `lo-true` / `lo-false` (lossless) | ✅ | Sets `Format.lossy`; threaded to libvips for WebP / AVIF (lossless wire format) and PNG (palette quantisation). |
+| `pr-true` / `pr-false` (progressive) | ✅ | Sets `Format.progressive`; threaded to libvips on JPEG / PNG. |
+| `cp-<n>` (chroma subsampling) | ✅ | `cp-0` = `:auto` (libvips default); `cp-1` = `:on` (4:2:0); `cp-2` / `cp-3` = `:off` (4:4:4 full chroma). Threaded to libvips on JPEG / AVIF. |
 
 ### Effects
 
@@ -80,10 +80,11 @@ Every option ImageKit documents in [the transformation reference](https://imagek
 | `e-usm-<radius>-<sigma>-<amount>-<threshold>` | ⚠️ | Approximated by mapping the `<sigma>` component to libvips `Sharpen` sigma; the radius/amount/threshold tweaks are not modelled. |
 | `e-grayscale` / `e-greyscale` | ✅ | Approximated as `Adjust{saturation: 0}`. |
 | `e-contrast` | ⚠️ | ImageKit's auto-contrast toggle; we approximate as `Adjust{contrast: 1.1}` (a mild bump). Real visual difference on low-contrast inputs. |
-| `e-shadow` | ❌ | Needs a drop-shadow helper in the Image library — returns `:unsupported_option`. |
+| `e-shadow` / `e-shadow-bl-<n>_st-<n>_x-<n>_y-<n>_c-<hex>` | ✅ | Wraps `Image.drop_shadow/2`. Each component is optional; defaults: `bl=10` (sigma 5.0), `st=50`, `x=0`, `y=10`, `c=000000`. ImageKit's `bl` is doubled by libvips' Gaussian sigma convention (`sigma = bl / 2`). |
 | `e-gradient` | ❌ | Needs a gradient overlay helper — returns `:unsupported_option`. |
 | `e-removedotbg` / `e-bgremove` / `e-changebg` / `e-edit` | ❌ | Third-party generative-AI calls; not implemented. |
-| `e-retouch` / `e-upscale` | ❌ | Model-driven enhancement / super-resolution; not implemented. |
+| `e-retouch` | ⚠️ | Maps to `Image.enhance/2`, a sensible-defaults stack of luminance equalisation + saturation boost + mild sharpen. ImageKit's hosted version is ML-driven; output is visually similar but not byte-identical. |
+| `e-upscale` | ❌ | Model-driven super-resolution; not implemented. |
 
 ### Geometry
 
@@ -108,8 +109,8 @@ Every option ImageKit documents in [the transformation reference](https://imagek
 | `ik-s` | ✅ | HMAC signature (handled by `Image.Plug.Provider.ImageKit.Signing`). |
 | `ik-t` | ✅ | Used by signing; the verifier rejects after this unix-seconds timestamp. |
 | `t-<name>` | ❌ | Named (server-side alias) transformations not modelled by the IR. Returns `:unsupported_option`. |
-| `ar-<W>-<H>` (aspect-ratio shortcut) | ❌ | Not implemented in v0.1. |
-| `z-<n>` (zoom) | ❌ | Not implemented in v0.1. |
+| `ar-<W>-<H>` (aspect-ratio shortcut) | ✅ | When given alongside exactly one of `w`/`h`, derives the other from the ratio. With both `w` and `h` already explicit, `ar-` is a no-op. |
+| `z-<n>` (zoom) | ⚠️ | Parsed and stored on the Resize op (`face_zoom` field). The interpreter does not yet act on it (matches Cloudflare's `face-zoom`); requires face detection in `:image`. |
 
 ## Behavioural differences
 
