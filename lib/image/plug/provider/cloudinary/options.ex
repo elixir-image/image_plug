@@ -364,6 +364,21 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
     end
   end
 
+  # `z_<float>` — face-zoom factor, only meaningful with
+  # `g_face`. Range `[0.0, 1.0]` matches the IR's
+  # `Resize.face_zoom` and the symmetric ImageKit `z-` /
+  # Cloudflare `face-zoom=` parsers.
+  defp apply_entry("z", value, acc, _strict?) do
+    case Float.parse(value) do
+      {f, ""} when f >= 0.0 and f <= 1.0 ->
+        resize = ensure_resize(acc.resize) |> Map.put(:face_zoom, f)
+        {:ok, %{acc | resize: resize}}
+
+      _ ->
+        {:error, invalid("z", value)}
+    end
+  end
+
   defp apply_entry("c", value, acc, _strict?) do
     case Map.fetch(@c_to_fit, value) do
       {:ok, fit} ->
