@@ -494,7 +494,10 @@ defmodule Image.Plug.Provider.Imgix.Options do
       :error ->
         {:error,
          Error.new(:unsupported_option,
-           "imgix `cs=#{value}` not implemented (Adobe RGB and other ICC profiles need a `colorspace/3` helper that accepts ICC strings — see TODO.md)",
+           "imgix `cs=#{value}` not implemented. " <>
+             "Custom-ICC profiles (Adobe RGB, ProPhoto, etc.) need an `Ops.IccTransform{}` " <>
+             "op constructed programmatically with `profile: \"path/to/profile.icc\"` — " <>
+             "the parser does not synthesise these from URL strings.",
            details: %{key: "cs", value: value}
          )}
     end

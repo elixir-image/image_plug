@@ -544,7 +544,10 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
       :error ->
         {:error,
          Error.new(:unsupported_option,
-           "cloudinary `cs_#{value}` not implemented (Adobe RGB and other ICC profiles need a `colorspace/3` helper that accepts ICC strings — see TODO.md)",
+           "cloudinary `cs_#{value}` not implemented. " <>
+             "Custom-ICC profiles (Adobe RGB, ProPhoto, etc.) need an `Ops.IccTransform{}` " <>
+             "op constructed programmatically with `profile: \"path/to/profile.icc\"` — " <>
+             "the parser does not synthesise these from URL strings.",
            details: %{key: "cs", value: value}
          )}
     end

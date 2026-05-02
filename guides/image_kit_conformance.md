@@ -82,7 +82,8 @@ Every option ImageKit documents in [the transformation reference](https://imagek
 | `e-contrast` | ⚠️ | ImageKit's auto-contrast toggle; we approximate as `Adjust{contrast: 1.1}` (a mild bump). Real visual difference on low-contrast inputs. |
 | `e-shadow` / `e-shadow-bl-<n>_st-<n>_x-<n>_y-<n>_c-<hex>` | ✅ | Wraps `Image.drop_shadow/2`. Each component is optional; defaults: `bl=10` (sigma 5.0), `st=50`, `x=0`, `y=10`, `c=000000`. ImageKit's `bl` is doubled by libvips' Gaussian sigma convention (`sigma = bl / 2`). |
 | `e-gradient` | ❌ | Needs a gradient overlay helper — returns `:unsupported_option`. |
-| `e-removedotbg` / `e-bgremove` / `e-changebg` / `e-edit` | ❌ | Third-party generative-AI calls; not implemented. |
+| `e-removedotbg` / `e-bgremove` | ⚠️ | `Image.Background.remove/2` ships in the optional [`:image_vision`](https://hex.pm/packages/image_vision) library (BiRefNet-lite). Not yet wired into an `image_plug` IR op — pending an `Ops.RemoveBackground{}` op behind a `Code.ensure_loaded?/1` guard. |
+| `e-changebg` / `e-edit` | ❌ | Generative-AI calls; not implemented. |
 | `e-retouch` | ⚠️ | Maps to `Image.enhance/2`, a sensible-defaults stack of luminance equalisation + saturation boost + mild sharpen. ImageKit's hosted version is ML-driven; output is visually similar but not byte-identical. |
 | `e-upscale` | ❌ | Model-driven super-resolution; not implemented. |
 

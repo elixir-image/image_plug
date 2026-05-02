@@ -116,7 +116,7 @@ Every option Cloudinary documents in [the transformation reference](https://clou
 | Key | Status | Notes |
 | --- | --- | --- |
 | `cs_srgb` / `cs_tinysrgb` / `cs_cmyk` / `cs_no_cmyk` | ✅ | Wraps `Image.to_colorspace/2`. `cs_tinysrgb` and `cs_no_cmyk` both map to `:srgb` (Cloudinary's tinification is a product layer, not a libvips colorspace). |
-| `cs_<other>` (Adobe RGB, custom ICC profiles) | ❌ | Needs a 3-arity `to_colorspace` (or `icc_transform`) helper in the Image library that accepts ICC profile strings. Returns `:unsupported_option`. |
+| `cs_<other>` (Adobe RGB, custom ICC profiles) | ⚠️ | `Image.to_colorspace/3` (ICC-driven) shipped in `:image` 0.67 and the IR has `Ops.IccTransform{}` wired through the interpreter. URL parsers deliberately don't synthesise this op — custom ICC paths shouldn't be URL-controllable. Compose `IccTransform` programmatically when needed. |
 | `t_<name>` | ❌ | Named (server-side alias) transformations are not modelled by the IR. Returns `:unsupported_option`. |
 | `if_<predicate>` | ❌ | Conditional transforms not implemented. |
 | `vc_<codec>` / `ac_<codec>` / `br_<rate>` | ❌ | Video-only options. Returns `:unsupported_option`. |

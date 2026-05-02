@@ -171,6 +171,15 @@ defmodule Image.Plug.Pipeline.Interpreter do
     end
   end
 
+  # ---------- IccTransform ----------
+
+  defp apply_op(%Ops.IccTransform{profile: profile, intent: intent}, image, _options) do
+    case Image.to_colorspace(image, profile, intent: intent) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("icc_transform", reason)}
+    end
+  end
+
   # ---------- ReplaceColor ----------
 
   defp apply_op(%Ops.ReplaceColor{} = replace, image, _options) do

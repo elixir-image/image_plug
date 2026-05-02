@@ -121,6 +121,9 @@ defmodule Image.Plug.Pipeline.Normaliser do
     # apply on top.
     {Ops.Enhance, 71},
     {Ops.Colorspace, 72},
+    # Profile-driven colourspace conversion runs alongside the
+    # named-mode Colorspace op (`:srgb` etc).
+    {Ops.IccTransform, 72},
     # Single-pass colour transforms after Adjust/Colorspace.
     {Ops.Sepia, 73},
     {Ops.Tint, 74},
@@ -155,6 +158,7 @@ defmodule Image.Plug.Pipeline.Normaliser do
     Ops.Adjust,
     Ops.Enhance,
     Ops.Colorspace,
+    Ops.IccTransform,
     Ops.Sepia,
     Ops.Tint,
     Ops.ReplaceColor,

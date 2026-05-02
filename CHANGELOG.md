@@ -21,8 +21,9 @@ All notable changes to this project will be documented in this file. See [Keep a
 * `Image.Plug.Pipeline.Ops.Orientation` — EXIF orientation override (`:value` 1..8).
 * `Image.Plug.Pipeline.Ops.Vignette` — radial darkening (`:strength`).
 * `Image.Plug.Pipeline.Ops.Enhance` — content-aware automatic enhancement (no fields; defaults from `Image.enhance/2`).
+* `Image.Plug.Pipeline.Ops.IccTransform` — ICC-profile-driven colourspace conversion (`:profile`, `:intent`). Distinct from the named-mode `Ops.Colorspace`. Wraps `Image.to_colorspace/3`. Provider parsers don't synthesise `IccTransform` from URL strings (custom profile paths shouldn't be URL-controllable); construct it programmatically when composing pipelines.
 
-The pipeline normaliser knows about all eleven, with sensible canonical positions and per-op no-op detection.
+The pipeline normaliser knows about all twelve, with sensible canonical positions and per-op no-op detection.
 
 ### Added — encoder
 

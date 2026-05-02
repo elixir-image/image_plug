@@ -62,7 +62,7 @@ See `image_components`'s own README and CHANGELOG for any further follow-ups.
 
 ### Still outstanding
 
-* **Colour-space conversion via ICC profiles** — `Image.to_colorspace/3` accepting ICC strings. Adobe RGB / custom-ICC `cs_<…>` / `cs=<…>` still return `:unsupported_option`.
+* **ICC profile colourspace** — `Image.to_colorspace/3` shipped in `:image` 0.67. The IR has `Ops.IccTransform{profile, intent}` and the interpreter is wired. Custom-ICC paths (Adobe RGB, ProPhoto) are deliberately *not* synthesised from URL strings — `cs_adobergb1998` / `cs=adobergb1998` still return `:unsupported_option`. Construct `IccTransform` ops directly when composing pipelines, or add an application-level `:icc_aliases` option to map URL tokens onto known profile paths.
 
 * **Auto-quality model** — content-aware quality picker for Cloudinary `q_auto`. Out of scope for `Image`; would need a calibrated heuristic.
 
@@ -72,7 +72,7 @@ See `image_components`'s own README and CHANGELOG for any further follow-ups.
 
 * **Auto-contrast (content-aware)** — ImageKit `e-contrast` is currently approximated as `Adjust{contrast: 1.1}`. A content-aware version (one of the `enhance/1` family) would be sharper.
 
-* **AI-driven calls** — background removal, super-resolution, generative edits. Permanent `:image` gap (live in `:image_vision` instead).
+* **AI-driven calls** — background removal **shipped in `:image_vision`** as `Image.Background.remove/2` and `Image.Background.mask/2` (BiRefNet-lite via Ortex). To wire ImageKit `e-bgremove` / `e-removedotbg` and Cloudinary `e_background_removal`, add an `Ops.RemoveBackground{}` IR op whose interpreter clause calls `Image.Background.remove/2` (only when `Code.ensure_loaded?(Image.Background)` is true — `:image_vision` is optional). Super-resolution and generative edits remain `:image_vision`-bound or out of scope.
 
 ### Notes
 

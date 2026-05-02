@@ -242,4 +242,23 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
                )
     end
   end
+
+  describe "IccTransform" do
+    test "applies a built-in profile via Image.to_colorspace/3", %{image: image} do
+      pipeline =
+        Pipeline.new()
+        |> Pipeline.append(%Ops.IccTransform{profile: :srgb, intent: :perceptual})
+
+      assert {:ok, converted} = Interpreter.execute(pipeline, image)
+      assert Image.width(converted) == Image.width(image)
+    end
+
+    test "rejects an unknown profile with a structured error", %{image: image} do
+      pipeline =
+        Pipeline.new()
+        |> Pipeline.append(%Ops.IccTransform{profile: :not_a_real_profile})
+
+      assert {:error, %Error{tag: :pipeline_failed}} = Interpreter.execute(pipeline, image)
+    end
+  end
 end
