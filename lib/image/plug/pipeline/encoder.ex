@@ -137,7 +137,7 @@ defmodule Image.Plug.Pipeline.Encoder do
   # ---------- raster formats ----------
 
   def encode(%Vix.Vips.Image{} = image, %Ops.Format{type: type} = format, encode_options)
-      when type in [:jpeg, :baseline_jpeg, :png, :webp] do
+      when type in [:jpeg, :baseline_jpeg, :png, :webp, :gif, :tiff, :jp2, :pdf] do
     do_encode_raster(image, format, encode_options)
   end
 
@@ -229,6 +229,43 @@ defmodule Image.Plug.Pipeline.Encoder do
      |> append_chroma_subsampling(f.chroma_subsampling)
      |> append_strip_metadata(f.metadata)}
   end
+
+  # GIF — single-frame export. libvips' GIF writer ignores `quality`
+  # (GIF is palette-based, not DCT/quality-based) so it's not
+  # forwarded.
+  defp format_settings(%Ops.Format{type: :gif} = f) do
+    {".gif", "image/gif", append_strip_metadata([], f.metadata)}
+  end
+
+  # TIFF — required by IIIF for archival workflows. libvips'
+  # TIFF writer accepts a `:compression` option (`:lzw`, `:deflate`,
+  # `:jpeg`, `:none`); default is LZW which gives a good size/CPU
+  # trade-off for non-photo content.
+  defp format_settings(%Ops.Format{type: :tiff} = f) do
+    {".tif", "image/tiff",
+     [compression: tiff_compression(f.compression), quality: f.quality]
+     |> append_strip_metadata(f.metadata)}
+  end
+
+  # JPEG 2000 — required by IIIF Compliance Level 2. Available
+  # only when libvips was built with `libopenjp2` (true on most
+  # modern bookworm builds; check via `Image.Plug.Capabilities`).
+  defp format_settings(%Ops.Format{type: :jp2} = f) do
+    {".jp2", "image/jp2",
+     [quality: f.quality]
+     |> append_strip_metadata(f.metadata)}
+  end
+
+  # PDF — single-page export. Useful for IIIF document servers; not
+  # appropriate for general image CDNs. libvips uses Cairo to write
+  # PDF, available on most Linux builds.
+  defp format_settings(%Ops.Format{type: :pdf} = f) do
+    {".pdf", "application/pdf", append_strip_metadata([], f.metadata)}
+  end
+
+  defp tiff_compression(:fast), do: :lzw
+  defp tiff_compression(nil), do: :lzw
+  defp tiff_compression(other) when is_atom(other), do: other
 
   defp append_progressive(opts, nil), do: opts
   defp append_progressive(opts, value) when is_boolean(value), do: opts ++ [progressive: value]

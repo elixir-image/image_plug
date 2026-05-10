@@ -107,8 +107,19 @@ defmodule Image.Plug do
 
   defp run(conn, options) do
     with :ok <- verify_signature(conn, options) |> wrap_unit(),
-         {:ok, parsed} <- wrap(options.provider.parse(conn, options.provider_options)),
-         {:ok, pipeline, source} <- wrap(resolve(parsed, options)),
+         {:ok, parsed} <- wrap(options.provider.parse(conn, options.provider_options)) do
+      case parsed do
+        {:info, kind, source} ->
+          run_info(conn, kind, source, options)
+
+        _ ->
+          run_render(conn, parsed, options)
+      end
+    end
+  end
+
+  defp run_render(conn, parsed, options) do
+    with {:ok, pipeline, source} <- wrap(resolve(parsed, options)),
          {:ok, normalised} <- wrap(Pipeline.Normaliser.normalise(pipeline)),
          {:ok, image, meta} <-
            wrap(options.source_resolver.load(source, options.source_resolver_options)) do
@@ -124,6 +135,42 @@ defmodule Image.Plug do
         end
       end
     end
+  end
+
+  # Info-document requests (currently only IIIF Image API 3.0
+  # `info.json`). Loads the source long enough to read its
+  # dimensions, builds the JSON document, and sends it as
+  # `application/ld+json` per the IIIF spec. No transform happens —
+  # the source bytes are not encoded into the response.
+  defp run_info(conn, :iiif_image_info, source, options) do
+    with {:ok, image, _meta} <-
+           wrap(options.source_resolver.load(source, options.source_resolver_options)) do
+      width = Image.width(image)
+      height = Image.height(image)
+      id = canonical_iiif_id(conn)
+      doc = Image.Plug.Provider.IIIF.InfoJson.build(id, {width, height})
+      body = :json.encode(doc) |> IO.iodata_to_binary()
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/ld+json")
+      |> Plug.Conn.put_resp_header("link", iiif_profile_link())
+      |> Plug.Conn.put_resp_header("cache-control", "public, max-age=86400")
+      |> Plug.Conn.send_resp(200, body)
+      |> then(&{:ok, &1})
+    end
+  end
+
+  # The IIIF spec wants the `id` to be the canonical URL of the
+  # image service — i.e. the request URL with `/info.json` stripped.
+  defp canonical_iiif_id(%Plug.Conn{} = conn) do
+    full = Plug.Conn.request_url(conn)
+    String.replace_suffix(full, "/info.json", "")
+  end
+
+  # Per IIIF Image API 3.0 §6, servers SHOULD include a `Link`
+  # header pointing to the profile URI in info.json responses.
+  defp iiif_profile_link do
+    ~s(<http://iiif.io/api/image/3/level2.json>;rel="profile")
   end
 
   # Lifts `{:ok, ...}` and `{:error, %Error{}}` into the

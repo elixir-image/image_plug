@@ -127,6 +127,31 @@ defmodule Image.Plug.Pipeline.Interpreter do
     end
   end
 
+  # ---------- Crop ----------
+
+  # Pixel coordinates pass straight through to `Image.crop/5`. The
+  # source dimensions are read at apply time so an out-of-bounds
+  # region can be clamped (the IIIF spec wants a 400 with a "could
+  # be returned smaller than requested" note rather than a hard
+  # rejection).
+  defp apply_op(%Ops.Crop{units: :pixels, x: x, y: y, width: w, height: h}, image, _options) do
+    do_crop(image, trunc(x), trunc(y), trunc(w), trunc(h))
+  end
+
+  # Percentage coordinates resolve against the actual source
+  # dimensions at apply time. Same op can therefore be reused
+  # across sources of different sizes — useful for IIIF's
+  # `pct:x,y,w,h` region form.
+  defp apply_op(%Ops.Crop{units: :percent, x: x, y: y, width: w, height: h}, image, _options) do
+    src_w = Image.width(image)
+    src_h = Image.height(image)
+    px = trunc(src_w * x / 100)
+    py = trunc(src_h * y / 100)
+    pw = trunc(src_w * w / 100)
+    ph = trunc(src_h * h / 100)
+    do_crop(image, px, py, pw, ph)
+  end
+
   # ---------- Adjust ----------
 
   defp apply_op(%Ops.Adjust{} = adjust, image, _options) do
@@ -377,6 +402,25 @@ defmodule Image.Plug.Pipeline.Interpreter do
 
   defp uncropped?(%{message: message}) when is_binary(message), do: message =~ "uncropped"
 
+  # ---------- Crop helpers ----------
+
+  # Clamp to the source bounds so out-of-range regions (which
+  # IIIF's spec permits the server to silently truncate) don't
+  # crash libvips.
+  defp do_crop(image, x, y, w, h) do
+    src_w = Image.width(image)
+    src_h = Image.height(image)
+    clamp_x = x |> max(0) |> min(src_w - 1)
+    clamp_y = y |> max(0) |> min(src_h - 1)
+    clamp_w = w |> max(1) |> min(src_w - clamp_x)
+    clamp_h = h |> max(1) |> min(src_h - clamp_y)
+
+    case Image.crop(image, clamp_x, clamp_y, clamp_w, clamp_h) do
+      {:ok, _} = success -> success
+      {:error, reason} -> {:error, op_error("crop", reason)}
+    end
+  end
+
   # ---------- Adjust helpers ----------
 
   defp do_adjust(adjust, image) do
@@ -542,6 +586,20 @@ defmodule Image.Plug.Pipeline.Interpreter do
       {:ok, _} = success -> success
       {:error, reason} -> {:error, op_error("border", reason)}
     end
+  end
+
+  # `size_pct` — resize by a percentage of the source dimensions.
+  # Maps to IIIF's `pct:N` size form. Computes the target pixel
+  # dimensions from the source size at apply time, then delegates
+  # to the standard width/height path so all the same fit /
+  # gravity / face-aware logic applies.
+  defp do_resize(%Ops.Resize{size_pct: pct} = resize, image)
+       when is_number(pct) and pct > 0 do
+    src_w = Image.width(image)
+    src_h = Image.height(image)
+    new_w = max(trunc(src_w * pct / 100), 1)
+    new_h = max(trunc(src_h * pct / 100), 1)
+    do_resize(%{resize | size_pct: nil, width: new_w, height: new_h}, image)
   end
 
   defp do_resize(%Ops.Resize{width: width, height: height} = resize, image)

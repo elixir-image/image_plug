@@ -16,6 +16,10 @@ defmodule Image.Plug.Pipeline.Ops.Format do
           | :jpeg
           | :baseline_jpeg
           | :png
+          | :gif
+          | :tiff
+          | :jp2
+          | :pdf
           | :json
 
   @type metadata :: :copyright | :keep | :none

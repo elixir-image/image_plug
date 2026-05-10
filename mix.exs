@@ -93,10 +93,14 @@ defmodule Image.Plug.MixProject do
       extras: [
         "README.md",
         "guides/usage.md",
+        "guides/sources.md",
+        "guides/face_aware.md",
+        "guides/cdn_origin.md",
         "guides/cloudflare_conformance.md",
         "guides/imgix_conformance.md",
         "guides/cloudinary_conformance.md",
         "guides/image_kit_conformance.md",
+        "guides/iiif_conformance.md",
         "CHANGELOG.md"
       ],
       groups_for_extras: [

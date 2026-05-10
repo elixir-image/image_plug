@@ -8,7 +8,7 @@ For Phoenix LiveView apps, the [`image_components`](https://hex.pm/packages/imag
 
 ## Why
 
-Pluggable URL grammars mean you can swap your image-CDN's URL syntax (Cloudflare Images, imgix, Imgur, …) without changing the source resolver, the variant store, or the rest of your application. The same canonical pipeline drives every transform.
+Pluggable URL grammars mean you can swap your image-CDN's URL syntax (Cloudflare Images, Cloudinary, imgix, ImageKit, IIIF Image API 3.0) without changing the source resolver, the variant store, or the rest of your application. The same canonical pipeline drives every transform.
 
 * **Plug-based** — mounts under any prefix from a `Plug.Router` or a Phoenix endpoint.
 * **Streaming** — `image` decodes the source progressively (`Image.open/2` for files; `Image.from_req_stream/2` for HTTP) and the encoder pipes its output through `Plug.Conn.send_chunked/2` + `Plug.Conn.chunk/2` so libvips never materialises the full encoded body in BEAM memory.
@@ -102,6 +102,20 @@ Routes mirror Cloudflare's variant API:
 | `DELETE` | `/:name` | Delete. |
 
 Bodies use the canonical JSON shape `{"name": ..., "options": ..., "metadata": {...}, "never_require_signed_urls": false}`. The plug does **not** authenticate requests — wrap it in your host's auth pipeline.
+
+## Guides
+
+* [Usage](https://hexdocs.pm/image_plug/usage.html) — mounting `Image.Plug` in Phoenix or `Plug.Router`, configuring provider + source resolver + variant store, error policy, telemetry.
+
+* [Sources](https://hexdocs.pm/image_plug/sources.html) — how source resolution works, the default file resolver, the streaming HTTP resolver, the Composite by-kind dispatcher, and a worked S3-resolver example.
+
+* [Face-aware crops](https://hexdocs.pm/image_plug/face_aware.html) — how `gravity=:face` and `face_zoom` integrate with the optional `:image_vision` dependency, and the URL grammar across the four providers.
+
+* [`image_plug` as a CDN-side service](https://hexdocs.pm/image_plug/cdn_origin.html) — deploying as the origin behind CloudFront / Fastly / Cloudflare / nginx, tuning `Cache-Control` for immutable vs mutable URLs, content-negotiation with `Vary: Accept`, invalidation strategies, and operational concerns.
+
+* Per-CDN conformance: [Cloudflare](https://hexdocs.pm/image_plug/cloudflare_conformance.html), [imgix](https://hexdocs.pm/image_plug/imgix_conformance.html), [Cloudinary](https://hexdocs.pm/image_plug/cloudinary_conformance.html), [ImageKit](https://hexdocs.pm/image_plug/image_kit_conformance.html), [IIIF Image API 3.0](https://hexdocs.pm/image_plug/iiif_conformance.html) — what each provider's URL grammar parses, with a `✅` / `⚠️` / `❌` matrix.
+
+For server-rendered components — `<.image>` and `<.picture>` — see the companion library [`image_components`](https://hex.pm/packages/image_components).
 
 ## Configuration reference
 

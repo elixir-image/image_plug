@@ -32,11 +32,19 @@ defmodule Image.Plug.Provider do
 
   * `{:passthrough, source}` — no transforms. The plug streams the
     source unchanged.
+
+  * `{:info, info_kind, source}` — the request is for a metadata
+    document (currently only `:iiif_image_info` for the IIIF Image
+    API 3.0 `info.json`). The plug builds the document by reading
+    the source's dimensions and serialises as JSON.
   """
+  @type info_kind :: :iiif_image_info
+
   @type result ::
           {:pipeline, Pipeline.t(), Source.t()}
           | {:variant, name :: String.t(), [override()], Source.t()}
           | {:passthrough, Source.t()}
+          | {:info, info_kind(), Source.t()}
 
   @doc """
   Parses a request into one of the `t:result/0` shapes.

@@ -78,13 +78,57 @@ defmodule Image.Plug.Capabilities do
     end
   end
 
-  defp probe_avif_write do
-    # Encode a 1×1 image as AVIF in memory. Any error means libvips
-    # can't write AVIF — most commonly because it was built without
-    # `libheif` and an AV1 encoder.
+  defp probe_avif_write, do: probe_format_write(".avif")
+
+  @doc """
+  Returns whether the local libvips can encode TIFF.
+
+  Required by IIIF Image API 3.0 Compliance Level 2 deployments
+  that promise TIFF support.
+
+  ### Returns
+
+  * `true` if libvips can write TIFF.
+
+  * `false` otherwise.
+
+  """
+  @spec tiff_write?() :: boolean()
+  def tiff_write?, do: cached_probe({__MODULE__, :tiff_write?}, ".tif")
+
+  @doc """
+  Returns whether the local libvips can encode JPEG 2000 (JP2).
+
+  Required by IIIF Image API 3.0 Compliance Level 2 deployments
+  that promise JP2 support. Available only when libvips was built
+  with `libopenjp2`.
+
+  ### Returns
+
+  * `true` if libvips can write JP2.
+
+  * `false` otherwise.
+
+  """
+  @spec jp2_write?() :: boolean()
+  def jp2_write?, do: cached_probe({__MODULE__, :jp2_write?}, ".jp2")
+
+  defp cached_probe(key, suffix) do
+    case :persistent_term.get(key, :unprobed) do
+      :unprobed ->
+        result = probe_format_write(suffix)
+        :persistent_term.put(key, result)
+        result
+
+      result when is_boolean(result) ->
+        result
+    end
+  end
+
+  defp probe_format_write(suffix) do
     case Image.new(1, 1, color: [0, 0, 0]) do
       {:ok, image} ->
-        case Image.write(image, :memory, suffix: ".avif", quality: 50) do
+        case Image.write(image, :memory, suffix: suffix, quality: 50) do
           {:ok, _bytes} -> true
           {:error, _reason} -> false
         end

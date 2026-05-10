@@ -36,7 +36,8 @@ defmodule Image.Plug.Pipeline.Ops.Resize do
           gravity: gravity(),
           upscale?: boolean(),
           dpr: pos_integer(),
-          face_zoom: float()
+          face_zoom: float(),
+          size_pct: nil | number()
         }
 
   defstruct width: nil,
@@ -45,5 +46,13 @@ defmodule Image.Plug.Pipeline.Ops.Resize do
             gravity: :center,
             upscale?: true,
             dpr: 1,
-            face_zoom: 0.0
+            face_zoom: 0.0,
+            # Percentage-of-source resize. When set (a positive number,
+            # typically `0.0..100.0`), the interpreter resizes by this
+            # percentage instead of using `width`/`height`. Mutually
+            # exclusive with `width`/`height`; the IIIF Image API 3.0
+            # `pct:N` size form maps to this field, and the URL builder
+            # emits `pct:N` when `size_pct` is set and dimensions are
+            # nil.
+            size_pct: nil
 end

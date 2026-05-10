@@ -110,6 +110,11 @@ defmodule Image.Plug.Pipeline.Normaliser do
     {Ops.Orientation, 5},
     {Ops.Trim, 10},
     {Ops.Background, 20},
+    # Crop is an absolute extract of a sub-rectangle and runs
+    # before Resize so the IIIF spec order
+    # `region → size → rotation → quality → format` is preserved
+    # on round-trips through the IIIF provider.
+    {Ops.Crop, 25},
     {Ops.Resize, 30},
     {Ops.Rotate, 40},
     {Ops.Flip, 50},
@@ -253,7 +258,8 @@ defmodule Image.Plug.Pipeline.Normaliser do
     end)
   end
 
-  defp noop?(%Ops.Resize{width: nil, height: nil}), do: true
+  defp noop?(%Ops.Resize{width: nil, height: nil, size_pct: nil}), do: true
+  defp noop?(%Ops.Resize{width: nil, height: nil, size_pct: pct}) when pct in [0, +0.0], do: true
   defp noop?(%Ops.Rotate{angle: angle}) when angle == 0 or angle == +0.0, do: true
   defp noop?(%Ops.Flip{direction: nil}), do: true
   defp noop?(%Ops.Sharpen{sigma: sigma}) when sigma in [0, +0.0], do: true
@@ -277,6 +283,12 @@ defmodule Image.Plug.Pipeline.Normaliser do
   defp noop?(%Ops.Pixelate{scale: s}) when s >= 1.0, do: true
 
   defp noop?(%Ops.Trim{mode: :explicit, top: 0, right: 0, bottom: 0, left: 0}), do: true
+
+  # Crop with zero or negative dimensions extracts no area and is
+  # treated as a no-op. The IIIF spec requires servers to reject
+  # such regions; the normaliser drops them quietly so a stray
+  # `region={:pixels, 0, 0, 0, 0}` doesn't crash the pipeline.
+  defp noop?(%Ops.Crop{width: w, height: h}) when w <= 0 or h <= 0, do: true
 
   defp noop?(_), do: false
 end
