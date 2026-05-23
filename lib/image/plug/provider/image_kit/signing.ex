@@ -68,8 +68,7 @@ defmodule Image.Plug.Provider.ImageKit.Signing do
 
     case extract_signature(path_with_query) do
       {nil, _} when required? ->
-        {:error,
-         Error.new(:signature_required, "request must carry an `ik-s` query parameter")}
+        {:error, Error.new(:signature_required, "request must carry an `ik-s` query parameter")}
 
       {nil, _} ->
         :ok

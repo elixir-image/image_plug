@@ -38,7 +38,9 @@ defmodule Image.Plug.Provider.IIIF.OptionsTest do
 
     test "square → percent Crop covering whole image (lossy fallback)" do
       assert {:ok, %Pipeline{ops: ops}} = parse("square", "max", "0", "default.jpg")
-      assert %Ops.Crop{units: :percent, width: 100, height: 100} = Enum.find(ops, &match?(%Ops.Crop{}, &1))
+
+      assert %Ops.Crop{units: :percent, width: 100, height: 100} =
+               Enum.find(ops, &match?(%Ops.Crop{}, &1))
     end
 
     test "garbage region → malformed_url" do
@@ -49,7 +51,9 @@ defmodule Image.Plug.Provider.IIIF.OptionsTest do
   describe "size" do
     test "max → Resize{upscale?: false}" do
       assert {:ok, %Pipeline{ops: ops}} = parse("full", "max", "0", "default.jpg")
-      assert %Ops.Resize{upscale?: false, width: nil, height: nil} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
+      assert %Ops.Resize{upscale?: false, width: nil, height: nil} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test "^max → Resize{upscale?: true}" do
@@ -59,7 +63,9 @@ defmodule Image.Plug.Provider.IIIF.OptionsTest do
 
     test "w, → width-only Resize" do
       assert {:ok, %Pipeline{ops: ops}} = parse("full", "600,", "0", "default.jpg")
-      assert %Ops.Resize{width: 600, height: nil, upscale?: false} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
+      assert %Ops.Resize{width: 600, height: nil, upscale?: false} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test ",h → height-only Resize" do
@@ -69,22 +75,30 @@ defmodule Image.Plug.Provider.IIIF.OptionsTest do
 
     test "w,h → squeeze fit" do
       assert {:ok, %Pipeline{ops: ops}} = parse("full", "600,400", "0", "default.jpg")
-      assert %Ops.Resize{width: 600, height: 400, fit: :squeeze} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
+      assert %Ops.Resize{width: 600, height: 400, fit: :squeeze} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test "!w,h → contain fit" do
       assert {:ok, %Pipeline{ops: ops}} = parse("full", "!600,400", "0", "default.jpg")
-      assert %Ops.Resize{width: 600, height: 400, fit: :contain} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
+      assert %Ops.Resize{width: 600, height: 400, fit: :contain} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test "^!w,h → contain fit + upscale" do
       assert {:ok, %Pipeline{ops: ops}} = parse("full", "^!600,400", "0", "default.jpg")
-      assert %Ops.Resize{width: 600, height: 400, fit: :contain, upscale?: true} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
+      assert %Ops.Resize{width: 600, height: 400, fit: :contain, upscale?: true} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test "pct:N → size_pct" do
       assert {:ok, %Pipeline{ops: ops}} = parse("full", "pct:50", "0", "default.jpg")
-      assert %Ops.Resize{size_pct: 50.0, upscale?: false, width: nil, height: nil} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
+      assert %Ops.Resize{size_pct: 50.0, upscale?: false, width: nil, height: nil} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test "garbage size → malformed_url" do

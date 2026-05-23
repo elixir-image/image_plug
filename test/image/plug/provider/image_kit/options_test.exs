@@ -194,9 +194,7 @@ defmodule Image.Plug.Provider.ImageKit.OptionsTest do
   describe "round-trip canonical ordering" do
     test "rotate -> resize -> background -> border -> adjust -> sharpen -> blur" do
       {:ok, pipeline} =
-        Options.parse(
-          "e-blur-200,e-sharpen-20,e-contrast,b-2_fff,bg-000,w-200,c-extract,rt-90"
-        )
+        Options.parse("e-blur-200,e-sharpen-20,e-contrast,b-2_fff,bg-000,w-200,c-extract,rt-90")
 
       kinds = Enum.map(pipeline.ops, & &1.__struct__)
 

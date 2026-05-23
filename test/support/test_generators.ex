@@ -61,7 +61,9 @@ defmodule Image.Plug.TestGenerators do
   end
 
   def valid_metadata, do: member_of(["copyright", "keep", "none"])
-  def invalid_metadata, do: filter(string(:alphanumeric, max_length: 8), &(&1 not in known_metadata()))
+
+  def invalid_metadata,
+    do: filter(string(:alphanumeric, max_length: 8), &(&1 not in known_metadata()))
 
   def valid_anim, do: member_of(["true", "false"])
   def invalid_anim, do: one_of([constant("yes"), constant(""), constant("1")])

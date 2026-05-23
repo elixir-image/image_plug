@@ -26,7 +26,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "width=N produces an image of decoded width N", %{base_url: base_url} do
-    check all width <- valid_width(), max_runs: 25 do
+    check all(width <- valid_width(), max_runs: 25) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{width},format=jpeg,fit=cover,height=#{width}/landscape.jpg",
@@ -40,7 +40,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "height=N produces an image of decoded height N", %{base_url: base_url} do
-    check all height <- valid_height(), max_runs: 25 do
+    check all(height <- valid_height(), max_runs: 25) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{height},height=#{height},fit=cover,format=jpeg/landscape.jpg",
@@ -60,8 +60,11 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
     {:ok, source} = Image.open(Path.join(@fixtures, "landscape.jpg"))
     source_width = Image.width(source)
 
-    check all width <- one_of([integer(50..source_width), integer(source_width + 1..source_width * 2)]),
-              max_runs: 25 do
+    check all(
+            width <-
+              one_of([integer(50..source_width), integer((source_width + 1)..(source_width * 2))]),
+            max_runs: 25
+          ) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{width},fit=scale-down,format=jpeg/landscape.jpg",
@@ -78,7 +81,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "format=jpeg produces JPEG magic bytes", %{base_url: base_url} do
-    check all width <- integer(50..400), max_runs: 25 do
+    check all(width <- integer(50..400), max_runs: 25) do
       response =
         fetch_image("/cdn-cgi/image/width=#{width},format=jpeg/portrait.jpg", base_url)
 
@@ -89,7 +92,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "format=png produces PNG magic bytes", %{base_url: base_url} do
-    check all width <- integer(50..400), max_runs: 25 do
+    check all(width <- integer(50..400), max_runs: 25) do
       response =
         fetch_image("/cdn-cgi/image/width=#{width},format=png/portrait.jpg", base_url)
 
@@ -100,7 +103,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "format=webp produces WebP magic bytes", %{base_url: base_url} do
-    check all width <- integer(50..400), max_runs: 25 do
+    check all(width <- integer(50..400), max_runs: 25) do
       response =
         fetch_image("/cdn-cgi/image/width=#{width},format=webp/portrait.jpg", base_url)
 
@@ -113,7 +116,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   property "rotate=90 swaps width and height", %{base_url: base_url} do
     # landscape.jpg has aspect-ratio > 1 (wider than tall). After
     # rotate=90 the output's height should exceed its width.
-    check all width <- integer(50..200), max_runs: 25 do
+    check all(width <- integer(50..200), max_runs: 25) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{width},rotate=90,format=jpeg/landscape.jpg",
@@ -129,7 +132,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "flip=h preserves dimensions", %{base_url: base_url} do
-    check all width <- integer(50..200), max_runs: 25 do
+    check all(width <- integer(50..200), max_runs: 25) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{width},height=#{width},fit=cover,flip=h,format=jpeg/portrait.jpg",
@@ -144,7 +147,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "dpr=N multiplies dimensions by N", %{base_url: base_url} do
-    check all width <- integer(50..200), dpr <- integer(1..3), max_runs: 25 do
+    check all(width <- integer(50..200), dpr <- integer(1..3), max_runs: 25) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{width},height=#{width},fit=cover,dpr=#{dpr},format=jpeg/portrait.jpg",
@@ -159,7 +162,7 @@ defmodule Image.Plug.Integration.CompliantPropertiesTest do
   end
 
   property "format=auto with Accept: image/webp returns WebP", %{base_url: base_url} do
-    check all width <- integer(50..200), max_runs: 15 do
+    check all(width <- integer(50..200), max_runs: 15) do
       response =
         fetch_image(
           "/cdn-cgi/image/width=#{width},format=auto/portrait.jpg",

@@ -21,7 +21,8 @@ defmodule Image.Plug.Pipeline.EncoderTest do
       test "#{type} streams with the right content-type and magic bytes", %{image: image} do
         format = %Ops.Format{type: unquote(type), quality: 80, metadata: :copyright}
 
-        assert {:ok, {:stream, stream}, unquote(expected_content_type)} = Encoder.encode(image, format)
+        assert {:ok, {:stream, stream}, unquote(expected_content_type)} =
+                 Encoder.encode(image, format)
 
         bytes = Enum.into(stream, <<>>)
         assert byte_size(bytes) > 0

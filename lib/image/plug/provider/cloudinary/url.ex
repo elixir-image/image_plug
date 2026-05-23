@@ -132,8 +132,7 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
     if List.starts_with?(path_info, mount_segments) do
       {:ok, Enum.drop(path_info, length(mount_segments))}
     else
-      {:error,
-       Error.new(:malformed_url, "request path does not sit under the configured mount")}
+      {:error, Error.new(:malformed_url, "request path does not sit under the configured mount")}
     end
   end
 
@@ -168,7 +167,8 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
 
   defp split_path(_, _) do
     {:error,
-     Error.new(:malformed_url,
+     Error.new(
+       :malformed_url,
        "cloudinary URL needs at least <account>/<resource>/<delivery>/<source>"
      )}
   end
@@ -209,8 +209,12 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
     # only appear on the source), and every comma-split chunk has a
     # `_` in it.
     cond do
-      String.contains?(segment, ".") -> false
-      not String.contains?(segment, "_") -> false
+      String.contains?(segment, ".") ->
+        false
+
+      not String.contains?(segment, "_") ->
+        false
+
       true ->
         segment
         |> String.split(",", trim: true)

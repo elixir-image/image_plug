@@ -1,8 +1,8 @@
 defmodule Image.Plug.MixProject do
   use Mix.Project
 
-  @version "0.1.0-rc.0"
-  @source_url "https://github.com/kipcole9/image_plug"
+  @version "0.1.0"
+  @source_url "https://github.com/elixir-image/image_plug"
 
   def project do
     [
@@ -18,7 +18,8 @@ defmodule Image.Plug.MixProject do
       docs: docs(),
       dialyzer: [
         plt_add_apps: [:plug, :ex_unit],
-        flags: [:error_handling, :unknown, :extra_return]
+        flags: [:error_handling, :unknown, :extra_return],
+        ignore_warnings: ".dialyzer_ignore.exs"
       ]
     ]
   end
@@ -80,8 +81,7 @@ defmodule Image.Plug.MixProject do
         "CHANGELOG.md",
         "LICENSE.md",
         "logo.jpg",
-        "guides",
-        "plans"
+        "guides"
       ]
     ]
   end
@@ -104,8 +104,8 @@ defmodule Image.Plug.MixProject do
         "CHANGELOG.md"
       ],
       groups_for_extras: [
-        "Guides": ~r{guides/},
-        "About": ["README.md", "CHANGELOG.md"]
+        Guides: ~r{guides/},
+        About: ["README.md", "CHANGELOG.md"]
       ],
       source_ref: "v#{@version}",
       groups_for_modules: [
@@ -125,7 +125,7 @@ defmodule Image.Plug.MixProject do
         "Cloudflare provider": ~r/^Image\.Plug\.Provider\.Cloudflare/,
         "Default source resolvers": ~r/^Image\.Plug\.SourceResolver\.[A-Z]/,
         "Default variant stores": ~r/^Image\.Plug\.VariantStore\.[A-Z]/,
-        "Internals": ~r/^Image\.Plug\./
+        Internals: ~r/^Image\.Plug\./
       ]
     ]
   end

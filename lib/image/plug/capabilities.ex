@@ -5,8 +5,9 @@ defmodule Image.Plug.Capabilities do
   Run once at application boot. Results are cached in
   `:persistent_term` so per-request reads are free.
 
-  M3 only probes AVIF write support. Adding a probe for another
-  capability is one new clause in `probe/0` and one new accessor.
+  Currently probes AVIF, JP2, and TIFF write support. Adding a
+  probe for another capability is one new clause in `probe/0` and
+  one new accessor.
   """
 
   require Logger

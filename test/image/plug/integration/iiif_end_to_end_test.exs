@@ -72,7 +72,9 @@ defmodule Image.Plug.Integration.IIIFEndToEndTest do
     test "pct:N — percentage resize", %{base_url: base_url} do
       # First fetch the original to know its dimensions, then
       # request 25% and verify the math.
-      {:ok, original_resp} = request(iiif_url("portrait.jpg", "full", "max", "0", "default.jpg"), base_url: base_url)
+      {:ok, original_resp} =
+        request(iiif_url("portrait.jpg", "full", "max", "0", "default.jpg"), base_url: base_url)
+
       {:ok, original} = Image.from_binary(original_resp.body)
       expected_w = trunc(Image.width(original) * 25 / 100)
 
@@ -101,7 +103,9 @@ defmodule Image.Plug.Integration.IIIFEndToEndTest do
 
     test "pct:x,y,w,h — percentage region", %{base_url: base_url} do
       # 50% × 50% region centred. Result aspect equals source aspect.
-      {:ok, original_resp} = request(iiif_url("landscape.jpg", "full", "max", "0", "default.jpg"), base_url: base_url)
+      {:ok, original_resp} =
+        request(iiif_url("landscape.jpg", "full", "max", "0", "default.jpg"), base_url: base_url)
+
       {:ok, original} = Image.from_binary(original_resp.body)
 
       url = iiif_url("landscape.jpg", "pct:25,25,50,50", "max", "0", "default.jpg")

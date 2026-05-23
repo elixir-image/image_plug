@@ -24,13 +24,15 @@ defmodule Image.Plug.Integration.CompositionPropertiesTest do
   import Image.Plug.TestGenerators
 
   property "any random valid N-key options string returns 200", %{base_url: base_url} do
-    check all options <- valid_options_string(4),
-              # Anchor the request to a known source-format combo
-              # by appending format=jpeg if format is unset (avoids
-              # `format=auto` content-negotiating against an empty
-              # Accept header).
-              options = ensure_format(options),
-              max_runs: 30 do
+    check all(
+            options <- valid_options_string(4),
+            # Anchor the request to a known source-format combo
+            # by appending format=jpeg if format is unset (avoids
+            # `format=auto` content-negotiating against an empty
+            # Accept header).
+            options = ensure_format(options),
+            max_runs: 30
+          ) do
       {:ok, response} = request("/cdn-cgi/image/#{options}/portrait.jpg", base_url: base_url)
 
       assert response.status == 200,
@@ -40,9 +42,11 @@ defmodule Image.Plug.Integration.CompositionPropertiesTest do
   end
 
   property "shuffling the option order produces the same ETag", %{base_url: base_url} do
-    check all options <- valid_options_string(4),
-              options = ensure_format(options),
-              max_runs: 25 do
+    check all(
+            options <- valid_options_string(4),
+            options = ensure_format(options),
+            max_runs: 25
+          ) do
       shuffled =
         options
         |> String.split(",", trim: true)

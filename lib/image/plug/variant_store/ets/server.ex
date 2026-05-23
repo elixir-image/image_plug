@@ -202,6 +202,7 @@ defmodule Image.Plug.VariantStore.ETS.Server do
 
       {:error, error} ->
         require Logger
+
         Logger.warning(
           "image_plug: failed to seed variant #{inspect(name)} from " <>
             "options string #{inspect(options_string)}: #{inspect(error)}"

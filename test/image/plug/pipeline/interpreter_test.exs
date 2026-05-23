@@ -17,7 +17,8 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
   end
 
   test "Resize :contain shrinks to fit", %{image: image} do
-    pipeline = Pipeline.new() |> Pipeline.append(%Ops.Resize{width: 200, height: 200, fit: :contain})
+    pipeline =
+      Pipeline.new() |> Pipeline.append(%Ops.Resize{width: 200, height: 200, fit: :contain})
 
     assert {:ok, resized} = Interpreter.execute(pipeline, image)
 
@@ -28,7 +29,8 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
   end
 
   test "Resize :cover fills the box exactly", %{image: image} do
-    pipeline = Pipeline.new() |> Pipeline.append(%Ops.Resize{width: 200, height: 200, fit: :cover})
+    pipeline =
+      Pipeline.new() |> Pipeline.append(%Ops.Resize{width: 200, height: 200, fit: :cover})
 
     assert {:ok, resized} = Interpreter.execute(pipeline, image)
     assert Image.width(resized) == 200
@@ -187,9 +189,7 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
       pipeline = Pipeline.new() |> Pipeline.append(%Ops.Draw{layers: [layer]})
 
       assert {:ok, composed} =
-               Interpreter.execute(pipeline, image,
-                 resolve_layer_source: watermark_resolver()
-               )
+               Interpreter.execute(pipeline, image, resolve_layer_source: watermark_resolver())
 
       # Composing should not change the base dimensions.
       assert Image.width(composed) == Image.width(image)
@@ -204,9 +204,7 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
         |> Pipeline.append(%Ops.Draw{layers: [layer, layer]})
 
       assert {:ok, composed} =
-               Interpreter.execute(pipeline, image,
-                 resolve_layer_source: watermark_resolver()
-               )
+               Interpreter.execute(pipeline, image, resolve_layer_source: watermark_resolver())
 
       assert Image.width(composed) == Image.width(image)
     end
@@ -237,9 +235,7 @@ defmodule Image.Plug.Pipeline.InterpreterTest do
       pipeline = Pipeline.new() |> Pipeline.append(%Ops.Draw{layers: [layer]})
 
       assert {:ok, _composed} =
-               Interpreter.execute(pipeline, image,
-                 resolve_layer_source: watermark_resolver()
-               )
+               Interpreter.execute(pipeline, image, resolve_layer_source: watermark_resolver())
     end
   end
 

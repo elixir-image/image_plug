@@ -72,8 +72,7 @@ defmodule Image.Plug.SourceResolver.File do
         end
 
       _ ->
-        {:error,
-         Error.new(:invalid_option, "SourceResolver.File requires a :root option")}
+        {:error, Error.new(:invalid_option, "SourceResolver.File requires a :root option")}
     end
   end
 
@@ -91,8 +90,7 @@ defmodule Image.Plug.SourceResolver.File do
   end
 
   defp resolve(_root, ref) do
-    {:error,
-     Error.new(:invalid_option, "source path must be absolute", details: %{path: ref})}
+    {:error, Error.new(:invalid_option, "source path must be absolute", details: %{path: ref})}
   end
 
   defp file_stat(absolute_path) do

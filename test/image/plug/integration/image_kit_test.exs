@@ -85,8 +85,7 @@ defmodule Image.Plug.Integration.ImageKitTest do
             {Image.Plug,
              [
                provider:
-                 {Image.Plug.Provider.ImageKit,
-                  signing: %{keys: @signing_keys, required?: true}},
+                 {Image.Plug.Provider.ImageKit, signing: %{keys: @signing_keys, required?: true}},
                source_resolver: {Image.Plug.SourceResolver.File, root: @fixtures},
                on_error: :status_text
              ]},

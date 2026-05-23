@@ -74,7 +74,8 @@ defmodule Image.Plug.Provider.Cloudinary.Signing do
     case extract_signature(path) do
       {nil, _} when required? ->
         {:error,
-         Error.new(:signature_required,
+         Error.new(
+           :signature_required,
            "request must carry a Cloudinary `s--<sig>--` segment"
          )}
 

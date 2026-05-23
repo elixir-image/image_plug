@@ -5,7 +5,10 @@ defmodule Image.Plug.VariantStore.Persistence.FileTest do
   alias Image.Plug.VariantStore.Persistence.File, as: FilePersistence
 
   setup do
-    dir = System.tmp_dir!() |> Path.join("image_plug_persistence_#{System.unique_integer([:positive])}")
+    dir =
+      System.tmp_dir!()
+      |> Path.join("image_plug_persistence_#{System.unique_integer([:positive])}")
+
     File.mkdir_p!(dir)
     path = Path.join(dir, "variants.json")
 

@@ -115,14 +115,16 @@ defmodule Image.Plug.Provider.IIIF.URL do
     # Bare identifier — the spec mandates a 303 redirect to info.json.
     # Not yet implemented; reject with a hint.
     {:error,
-     Error.new(:malformed_url,
+     Error.new(
+       :malformed_url,
        "IIIF bare-identifier requests should redirect to info.json (not yet implemented)"
      )}
   end
 
   defp dispatch(_segments) do
     {:error,
-     Error.new(:malformed_url,
+     Error.new(
+       :malformed_url,
        "URL does not match any IIIF Image API 3.0 form"
      )}
   end

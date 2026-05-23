@@ -41,7 +41,8 @@ defmodule Image.Plug.Provider.Cloudflare do
 
   @impl Image.Plug.Provider
   def parse(%Plug.Conn{} = conn, options) when is_list(options) do
-    with {:ok, recognised} <- URL.parse(conn, Keyword.take(options, [:mount, :hosted_account_hash])) do
+    with {:ok, recognised} <-
+           URL.parse(conn, Keyword.take(options, [:mount, :hosted_account_hash])) do
       build_result(recognised, options)
     end
   end

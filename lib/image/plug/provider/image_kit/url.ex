@@ -81,7 +81,8 @@ defmodule Image.Plug.Provider.ImageKit.URL do
 
     with {:ok, after_mount} <- strip_prefix(decoded, mount_segments, "mount"),
          {:ok, after_endpoint} <- strip_prefix(after_mount, endpoint_segments, "endpoint") do
-      {:ok, {transforms_string, source_segments}} = extract_transforms(after_endpoint, query_string)
+      {:ok, {transforms_string, source_segments}} =
+        extract_transforms(after_endpoint, query_string)
 
       case source_segments do
         [] ->

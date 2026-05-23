@@ -66,7 +66,8 @@ defmodule Image.Plug.SourceResolver.HTTP do
       :ok
     else
       {:error,
-       Error.new(:not_implemented,
+       Error.new(
+         :not_implemented,
          "SourceResolver.HTTP requires the optional :req dependency to be loaded"
        )}
     end

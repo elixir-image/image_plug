@@ -103,7 +103,9 @@ defmodule Image.Plug.Provider.Imgix.OptionsTest do
     end
 
     test "bg adds # if missing and emits Background op" do
-      assert {:ok, %Pipeline{ops: [%Ops.Background{color: "#ff0000"}]}} = Options.parse("bg=ff0000")
+      assert {:ok, %Pipeline{ops: [%Ops.Background{color: "#ff0000"}]}} =
+               Options.parse("bg=ff0000")
+
       assert {:ok, %Pipeline{ops: [%Ops.Background{color: "#fff"}]}} = Options.parse("bg=%23fff")
     end
   end

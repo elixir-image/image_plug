@@ -23,11 +23,11 @@ defmodule Image.Plug.Provider.Imgix.Options do
   Unknown keys raise `:unknown_option` by default; pass
   `strict?: false` to log and ignore.
 
-  Imgix-only features that don't fit the canonical IR
-  (`auto=enhance`, `sepia`, `cs=...`, `or`, AI tags) raise
-  `:unsupported_option` so users learn early. As the underlying
-  `Image` library adds helpers, these become `:ok` (see this
-  project's `TODO.md`).
+  Custom-ICC colourspaces (`cs=adobergb1998`, `cs=appleRGB`, etc.)
+  return `:unsupported_option` — the parser does not synthesise
+  those from URL strings. Construct an `Ops.IccTransform{profile,
+  intent}` op directly, or wire an application-level alias map.
+  See `guides/imgix_conformance.md` for the per-option matrix.
   """
 
   alias Image.Plug.{Error, Pipeline}
@@ -82,11 +82,6 @@ defmodule Image.Plug.Provider.Imgix.Options do
     "hv" => :both
   }
 
-  # Empty in the current build — every imgix option that maps
-  # cleanly is now wired. Kept as a named map so future imgix
-  # additions can land in one place if a parser is deferred.
-  @unsupported_keys %{}
-
   # imgix's `cs=<value>` accepts a small set of named colorspaces.
   # Map them to the atoms `Image.to_colorspace/2` accepts.
   @cs_to_target %{
@@ -98,7 +93,8 @@ defmodule Image.Plug.Provider.Imgix.Options do
 
   @unsupported_auto %{
     "redeye" => "imgix `auto=redeye` is not implemented",
-    "true" => "imgix `auto=true` is unspecified; pass an explicit value like `auto=format,compress`"
+    "true" =>
+      "imgix `auto=true` is unspecified; pass an explicit value like `auto=format,compress`"
   }
 
   @doc """
@@ -174,7 +170,9 @@ defmodule Image.Plug.Provider.Imgix.Options do
 
   # If a focalpoint crop was requested AND fp-x/fp-y were provided,
   # rewrite the resize op's gravity to {:xy, fx, fy}.
-  defp apply_focal_point(%{resize: %Ops.Resize{gravity: :focalpoint} = resize, focal_point: fp} = acc)
+  defp apply_focal_point(
+         %{resize: %Ops.Resize{gravity: :focalpoint} = resize, focal_point: fp} = acc
+       )
        when not is_nil(fp.x) and not is_nil(fp.y) do
     %{acc | resize: %{resize | gravity: {:xy, fp.x, fp.y}}}
   end
@@ -296,7 +294,9 @@ defmodule Image.Plug.Provider.Imgix.Options do
 
   defp parse_unit_float(key, value) when is_binary(value) do
     case Float.parse(value) do
-      {float, ""} when float >= 0.0 and float <= 1.0 -> {:ok, float}
+      {float, ""} when float >= 0.0 and float <= 1.0 ->
+        {:ok, float}
+
       :error ->
         case Integer.parse(value) do
           {0, ""} -> {:ok, 0.0}
@@ -493,7 +493,8 @@ defmodule Image.Plug.Provider.Imgix.Options do
 
       :error ->
         {:error,
-         Error.new(:unsupported_option,
+         Error.new(
+           :unsupported_option,
            "imgix `cs=#{value}` not implemented. " <>
              "Custom-ICC profiles (Adobe RGB, ProPhoto, etc.) need an `Ops.IccTransform{}` " <>
              "op constructed programmatically with `profile: \"path/to/profile.icc\"` — " <>
@@ -574,15 +575,6 @@ defmodule Image.Plug.Provider.Imgix.Options do
     end
   end
 
-  # Unsupported keys ---------------------------------------------------
-  #
-  # `@unsupported_keys` is currently empty. The dispatch clause
-  # below is kept so future deferrals can be added by populating
-  # the map without re-introducing the clause.
-  defp apply_entry(key, _value, _acc, _strict?) when is_map_key(@unsupported_keys, key) do
-    {:error, unsupported(key, @unsupported_keys[key] || "")}
-  end
-
   # Unknown keys -----------------------------------------------------
 
   defp apply_entry(key, _value, acc, false) do
@@ -592,9 +584,7 @@ defmodule Image.Plug.Provider.Imgix.Options do
 
   defp apply_entry(key, value, _acc, true) do
     {:error,
-     Error.new(:unknown_option, "unknown imgix option key",
-       details: %{key: key, value: value}
-     )}
+     Error.new(:unknown_option, "unknown imgix option key", details: %{key: key, value: value})}
   end
 
   # ---------- helpers used by per-key clauses ----------

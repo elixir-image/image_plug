@@ -81,7 +81,8 @@ defmodule Image.Plug.Provider.Cloudinary do
 
       other ->
         {:error,
-         Error.new(:invalid_option,
+         Error.new(
+           :invalid_option,
            "cloudinary :signing must be nil or %{keys: [...], required?: bool}",
            details: %{got: inspect(other)}
          )}
@@ -89,5 +90,7 @@ defmodule Image.Plug.Provider.Cloudinary do
   end
 
   defp request_path_with_query(%Plug.Conn{request_path: path, query_string: ""}), do: path
-  defp request_path_with_query(%Plug.Conn{request_path: path, query_string: q}), do: "#{path}?#{q}"
+
+  defp request_path_with_query(%Plug.Conn{request_path: path, query_string: q}),
+    do: "#{path}?#{q}"
 end

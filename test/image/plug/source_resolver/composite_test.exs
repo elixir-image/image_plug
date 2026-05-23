@@ -14,9 +14,7 @@ defmodule Image.Plug.SourceResolver.CompositeTest do
       send(self(), {:hosted_called, ref, options})
 
       {:error,
-       Image.Plug.Error.new(:source_not_found, "stub",
-         details: %{ref: ref, options: options}
-       )}
+       Image.Plug.Error.new(:source_not_found, "stub", details: %{ref: ref, options: options})}
     end
   end
 

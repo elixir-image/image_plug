@@ -14,7 +14,10 @@ defmodule Image.Plug do
   1. `provider.parse/2` — produces either a fully-formed pipeline +
      source, a variant lookup + source, or a passthrough source.
 
-  2. Variant resolution (M4 — currently returns `:not_implemented`).
+  2. Variant resolution against the configured
+     `Image.Plug.VariantStore`. Variant URLs of the form
+     `/<account>/<image-id>/<variant-name>` are expanded to the
+     stored pipeline; ad-hoc URLs skip this step.
 
   3. `Image.Plug.Pipeline.Normaliser.normalise/1`.
 
@@ -29,9 +32,6 @@ defmodule Image.Plug do
   7. The plug pipes the body to the client via
      `Plug.Conn.send_chunked/2` + `Plug.Conn.chunk/2`. Buffered bytes
      bodies use `Plug.Conn.send_resp/3`.
-
-  M2 ships steps 1, 3, 4, 5, 6, and 7. ETag + cache headers and the
-  full `:on_error` policy land in M6.
   """
 
   @behaviour Plug
@@ -64,7 +64,11 @@ defmodule Image.Plug do
     start_time = System.monotonic_time()
     metadata = %{request_path: conn.request_path, provider: options.provider}
 
-    :telemetry.execute(options.telemetry_prefix ++ [:request, :start], %{system_time: System.system_time()}, metadata)
+    :telemetry.execute(
+      options.telemetry_prefix ++ [:request, :start],
+      %{system_time: System.system_time()},
+      metadata
+    )
 
     try do
       result =
@@ -199,7 +203,9 @@ defmodule Image.Plug do
   end
 
   defp request_path_with_query(%Plug.Conn{request_path: path, query_string: ""}), do: path
-  defp request_path_with_query(%Plug.Conn{request_path: path, query_string: q}), do: "#{path}?#{q}"
+
+  defp request_path_with_query(%Plug.Conn{request_path: path, query_string: q}),
+    do: "#{path}?#{q}"
 
   defp run_encode(conn, normalised, image, meta, options, cache) do
     interpreter_options = [resolve_layer_source: layer_source_resolver(options)]
@@ -212,7 +218,9 @@ defmodule Image.Plug do
     with {:ok, transformed} <-
            Pipeline.Interpreter.execute(normalised, image, interpreter_options),
          {:ok, body, content_type, extra_headers} <-
-           normalise_encode(Pipeline.Encoder.encode(transformed, normalised.output, encode_options)) do
+           normalise_encode(
+             Pipeline.Encoder.encode(transformed, normalised.output, encode_options)
+           ) do
       {:ok, send_body(conn, body, content_type, extra_headers, cache)}
     end
   end
@@ -220,7 +228,11 @@ defmodule Image.Plug do
   # Picks the format the encoder will actually emit, used to compute
   # a cache key that differs across negotiated outputs. Mirrors the
   # encoder's own selection logic.
-  defp chosen_format(%Pipeline{output: %Image.Plug.Pipeline.Ops.Format{type: :auto}}, accept, meta) do
+  defp chosen_format(
+         %Pipeline{output: %Image.Plug.Pipeline.Ops.Format{type: :auto}},
+         accept,
+         meta
+       ) do
     cond do
       Image.Plug.Capabilities.avif_write?() and is_binary(accept) and
           String.contains?(accept, "image/avif") ->
@@ -241,11 +253,18 @@ defmodule Image.Plug do
     end
   end
 
-  defp chosen_format(%Pipeline{output: %Image.Plug.Pipeline.Ops.Format{type: type}}, _accept, _meta),
-    do: type
+  defp chosen_format(
+         %Pipeline{output: %Image.Plug.Pipeline.Ops.Format{type: type}},
+         _accept,
+         _meta
+       ),
+       do: type
 
   defp normalise_encode({:ok, body, content_type}), do: {:ok, body, content_type, []}
-  defp normalise_encode({:ok, body, content_type, headers}), do: {:ok, body, content_type, headers}
+
+  defp normalise_encode({:ok, body, content_type, headers}),
+    do: {:ok, body, content_type, headers}
+
   defp normalise_encode({:error, _} = error), do: error
 
   defp accept_header(conn) do
@@ -273,12 +292,12 @@ defmodule Image.Plug do
   end
 
   defp resolve({:passthrough, source}, _options) do
-    # M2: passthrough still runs through the interpreter (a no-op)
-    # and the encoder. The default `Format{type: :auto}` is not yet
-    # supported by the M2 encoder, so we substitute `:jpeg` here.
-    # M3 introduces `:auto` content-negotiation, and a future
-    # milestone will let passthrough stream the source bytes
-    # directly via a `SourceResolver.stream_bytes/2` callback.
+    # Passthrough still runs through the interpreter (a no-op pass)
+    # and the encoder, so a downstream cache sees a consistent
+    # response shape regardless of whether the URL carried any
+    # transforms. The encoder doesn't honour `Format{type: :auto}`
+    # without an explicit `Accept` negotiation context, so we
+    # substitute `:jpeg` here.
     pipeline =
       Pipeline.new(provider: Image.Plug.Provider.Cloudflare)
       |> Pipeline.put_output(%Image.Plug.Pipeline.Ops.Format{type: :jpeg, quality: 85})
@@ -293,16 +312,13 @@ defmodule Image.Plug do
         {:ok, merged, source}
 
       {:error, :not_found} ->
-        {:error,
-         Error.new(:variant_not_found, "no such variant",
-           details: %{name: name}
-         )}
+        {:error, Error.new(:variant_not_found, "no such variant", details: %{name: name})}
     end
   end
 
-  # M4 only: per-request overrides arrive as a keyword list of
-  # `Image.Plug.Pipeline` field replacements. The first override
-  # shape we honour is `{:output, %Ops.Format{}}` to swap the
+  # Per-request overrides arrive as a keyword list of
+  # `Image.Plug.Pipeline` field replacements. The override shape
+  # we currently honour is `{:output, %Ops.Format{}}` to swap the
   # output format. More override shapes land alongside the providers
   # that emit them.
   defp apply_variant_overrides(pipeline, []), do: pipeline
@@ -375,8 +391,12 @@ defmodule Image.Plug do
   defp stream_chunks(conn, stream) do
     Enum.reduce_while(stream, conn, fn chunk, acc ->
       case Plug.Conn.chunk(acc, chunk) do
-        {:ok, acc} -> {:cont, acc}
-        {:error, :closed} -> {:halt, acc}
+        {:ok, acc} ->
+          {:cont, acc}
+
+        {:error, :closed} ->
+          {:halt, acc}
+
         {:error, reason} ->
           Logger.warning("image_plug: stream chunk failed: #{inspect(reason)}")
           {:halt, acc}
@@ -696,7 +716,8 @@ defmodule Image.Plug do
 
   defp to_variant(_name, other, _options) do
     {:error,
-     Image.Plug.Error.new(:invalid_option,
+     Image.Plug.Error.new(
+       :invalid_option,
        "variant definition must be an options string, a Pipeline, or a {provider, string} tuple",
        details: %{got: inspect(other)}
      )}
@@ -708,7 +729,8 @@ defmodule Image.Plug do
 
   defp parse_with(provider, _options_string) do
     {:error,
-     Image.Plug.Error.new(:invalid_option,
+     Image.Plug.Error.new(
+       :invalid_option,
        "no options-string parser registered for provider",
        details: %{provider: provider}
      )}

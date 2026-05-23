@@ -105,7 +105,11 @@ defmodule Image.Plug.Provider.Cloudflare.OptionsTest do
 
   describe "aliases" do
     test "single-letter aliases normalise to the canonical key" do
-      assert {:ok, %Pipeline{ops: [%Ops.Resize{width: 100, height: 200, fit: :cover}], output: %Ops.Format{type: :webp, quality: 70}}} =
+      assert {:ok,
+              %Pipeline{
+                ops: [%Ops.Resize{width: 100, height: 200, fit: :cover}],
+                output: %Ops.Format{type: :webp, quality: 70}
+              }} =
                Options.parse("w=100,h=200,fit=cover,q=70,f=webp")
     end
   end

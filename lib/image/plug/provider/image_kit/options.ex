@@ -79,13 +79,10 @@ defmodule Image.Plug.Provider.ImageKit.Options do
       "imagekit `e-gradient` needs a gradient overlay helper in the Image library — see TODO.md",
     "removedotbg" =>
       "imagekit `e-removedotbg` is a third-party AI background-removal call; not implemented",
-    "bgremove" =>
-      "imagekit `e-bgremove` is an AI background-removal call; not implemented",
-    "changebg" =>
-      "imagekit `e-changebg` is a generative-AI call; not implemented",
+    "bgremove" => "imagekit `e-bgremove` is an AI background-removal call; not implemented",
+    "changebg" => "imagekit `e-changebg` is a generative-AI call; not implemented",
     "edit" => "imagekit `e-edit` is a generative-AI call; not implemented",
-    "upscale" =>
-      "imagekit `e-upscale` is a model-driven super-resolution call; not implemented"
+    "upscale" => "imagekit `e-upscale` is a model-driven super-resolution call; not implemented"
   }
 
   @unsupported_keys %{
@@ -606,9 +603,7 @@ defmodule Image.Plug.Provider.ImageKit.Options do
 
   defp apply_entry(key, value, _acc, true) do
     {:error,
-     Error.new(:unknown_option, "unknown imagekit option key",
-       details: %{key: key, value: value}
-     )}
+     Error.new(:unknown_option, "unknown imagekit option key", details: %{key: key, value: value})}
   end
 
   # ---------- helpers ----------

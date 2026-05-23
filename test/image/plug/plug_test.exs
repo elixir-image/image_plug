@@ -429,7 +429,8 @@ defmodule Image.PlugTest do
       # Inner URLs and `;` need percent-encoding because the path
       # otherwise gets split by `Plug.Conn` on `/` and `;`.
       inner =
-        URI.encode("url(https://example.com/wm.png);right=10;bottom=10",
+        URI.encode(
+          "url(https://example.com/wm.png);right=10;bottom=10",
           &URI.char_unreserved?/1
         )
 

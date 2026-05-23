@@ -94,8 +94,11 @@ defmodule Image.Plug.Admin do
     {store_module, store_options} = config.store
 
     case store_module.get(name, store_options) do
-      {:ok, variant} -> json_response(conn, 200, variant_to_json(variant))
-      {:error, :not_found} -> respond_error(conn, Error.new(:variant_not_found, "no such variant"))
+      {:ok, variant} ->
+        json_response(conn, 200, variant_to_json(variant))
+
+      {:error, :not_found} ->
+        respond_error(conn, Error.new(:variant_not_found, "no such variant"))
     end
   end
 
@@ -148,15 +151,24 @@ defmodule Image.Plug.Admin do
     {store_module, store_options} = config.store
 
     case store_module.delete(name, store_options) do
-      :ok -> json_response(conn, 200, %{"result" => %{"deleted" => name}})
-      {:error, :not_found} -> respond_error(conn, Error.new(:variant_not_found, "no such variant"))
+      :ok ->
+        json_response(conn, 200, %{"result" => %{"deleted" => name}})
+
+      {:error, :not_found} ->
+        respond_error(conn, Error.new(:variant_not_found, "no such variant"))
     end
   end
 
   defp put_and_respond(conn, store_module, store_options, variant, status) do
     case store_module.put(variant, store_options) do
-      {:ok, stored} -> json_response(conn, status, variant_to_json(stored))
-      {:error, reason} -> respond_error(conn, Error.new(:internal, "store rejected variant", details: %{reason: inspect(reason)}))
+      {:ok, stored} ->
+        json_response(conn, status, variant_to_json(stored))
+
+      {:error, reason} ->
+        respond_error(
+          conn,
+          Error.new(:internal, "store rejected variant", details: %{reason: inspect(reason)})
+        )
     end
   end
 
@@ -206,7 +218,8 @@ defmodule Image.Plug.Admin do
 
   defp parse_options(provider, _options_string) do
     {:error,
-     Error.new(:invalid_option,
+     Error.new(
+       :invalid_option,
        "no options-string parser registered for provider",
        details: %{provider: provider}
      )}

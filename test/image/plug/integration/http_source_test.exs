@@ -20,8 +20,7 @@ defmodule Image.Plug.Integration.HTTPSourceTest do
            [
              provider: {Image.Plug.Provider.Cloudflare, []},
              source_resolver:
-               {Image.Plug.SourceResolver.Composite,
-                http: [allowed_hosts: ["localhost"]]},
+               {Image.Plug.SourceResolver.Composite, http: [allowed_hosts: ["localhost"]]},
              on_error: :status_text
            ]},
         port: 0,

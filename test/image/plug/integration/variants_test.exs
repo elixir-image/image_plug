@@ -49,13 +49,11 @@ defmodule Image.Plug.Integration.VariantsTest do
         plug:
           {Image.Plug,
            [
-             provider:
-               {Image.Plug.Provider.Cloudflare, hosted_account_hash: "acct"},
+             provider: {Image.Plug.Provider.Cloudflare, hosted_account_hash: "acct"},
              source_resolver:
                {Image.Plug.SourceResolver.Composite,
                 file: [root: @fixtures], hosted: {HostedFileResolver, root: @fixtures}},
-             variant_store:
-               {Image.Plug.VariantStore.ETS, [table: table, server: server]},
+             variant_store: {Image.Plug.VariantStore.ETS, [table: table, server: server]},
              on_error: :status_text
            ]},
         port: 0,
@@ -89,7 +87,8 @@ defmodule Image.Plug.Integration.VariantsTest do
   end
 
   test "unknown variant returns 404 with the right error tag", %{base_url: base_url} do
-    {:ok, response} = Req.get(base_url <> "/acct/portrait.jpg/no-such-variant", decode_body: false)
+    {:ok, response} =
+      Req.get(base_url <> "/acct/portrait.jpg/no-such-variant", decode_body: false)
 
     assert response.status == 404
     assert response.headers["x-image-plug-error"] == ["variant_not_found"]

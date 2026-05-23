@@ -28,7 +28,8 @@ defmodule Image.Plug.Pipeline do
           | Ops.Draw.t()
           | Ops.Segment.t()
 
-  @type on_error :: :auto | :render_error_image | :fallback_to_source | :raise | {:status, 100..599}
+  @type on_error ::
+          :auto | :render_error_image | :fallback_to_source | :raise | {:status, 100..599}
 
   @type t :: %__MODULE__{
           ops: [op()],

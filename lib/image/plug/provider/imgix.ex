@@ -75,14 +75,18 @@ defmodule Image.Plug.Provider.Imgix do
 
       other ->
         {:error,
-         Error.new(:invalid_option, "imgix :signing must be nil or %{keys: [...], required?: bool}",
+         Error.new(
+           :invalid_option,
+           "imgix :signing must be nil or %{keys: [...], required?: bool}",
            details: %{got: inspect(other)}
          )}
     end
   end
 
   defp request_path_with_query(%Plug.Conn{request_path: path, query_string: ""}), do: path
-  defp request_path_with_query(%Plug.Conn{request_path: path, query_string: q}), do: "#{path}?#{q}"
+
+  defp request_path_with_query(%Plug.Conn{request_path: path, query_string: q}),
+    do: "#{path}?#{q}"
 
   # The default Format struct represents "no output options set".
   # Anything else means the request asked for a specific format,

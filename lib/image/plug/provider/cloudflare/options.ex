@@ -21,7 +21,9 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
   Aliases normalise to the canonical key before dispatch. Unknown
   keys raise `:unknown_option` by default; pass `strict?: false` to
   log and ignore them. Drawing/overlays via the URL `draw=` grammar
-  lands in M5.
+  (`url(...)`, `width`, `height`, `fit`, `gravity`, `opacity`, `top`,
+  `left`, `bottom`, `right`, `rotate`, `repeat`, `background`) are
+  parsed into `Ops.Draw` layers.
   """
 
   alias Image.Plug.{Error, Pipeline}
@@ -326,7 +328,8 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
     {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
   end
 
-  defp apply_entry("background", value, _acc, _strict?), do: {:error, invalid("background", value)}
+  defp apply_entry("background", value, _acc, _strict?),
+    do: {:error, invalid("background", value)}
 
   defp apply_entry("blur", value, acc, _strict?) do
     with {:ok, float} <- parse_non_neg_float("blur", value) do
@@ -463,7 +466,9 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
 
   defp parse_non_neg_float(key, value) when is_binary(value) do
     case Float.parse(value) do
-      {float, ""} when float >= 0.0 -> {:ok, float}
+      {float, ""} when float >= 0.0 ->
+        {:ok, float}
+
       :error ->
         case Integer.parse(value) do
           {integer, ""} when integer >= 0 -> {:ok, integer / 1}
@@ -526,7 +531,9 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
 
   defp parse_unit_float(value) do
     case Float.parse(value) do
-      {float, ""} -> {:ok, float}
+      {float, ""} ->
+        {:ok, float}
+
       _ ->
         case Integer.parse(value) do
           {integer, ""} -> {:ok, integer / 1}
@@ -559,8 +566,7 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
          {:ok, right} <- parse_non_neg_integer("trim", r),
          {:ok, bottom} <- parse_non_neg_integer("trim", b),
          {:ok, left} <- parse_non_neg_integer("trim", l) do
-      {:ok,
-       %Ops.Trim{mode: :explicit, top: top, right: right, bottom: bottom, left: left}}
+      {:ok, %Ops.Trim{mode: :explicit, top: top, right: right, bottom: bottom, left: left}}
     else
       _ -> {:error, invalid("trim", value)}
     end
@@ -584,14 +590,12 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
              {:ok, right} <- border_side(parts, "right"),
              {:ok, bottom} <- border_side(parts, "bottom"),
              {:ok, left} <- border_side(parts, "left") do
-          {:ok,
-           %Ops.Border{color: color, top: top, right: right, bottom: bottom, left: left}}
+          {:ok, %Ops.Border{color: color, top: top, right: right, bottom: bottom, left: left}}
         end
 
       width_value ->
         with {:ok, width} <- parse_non_neg_integer("border", width_value) do
-          {:ok,
-           %Ops.Border{color: color, top: width, right: width, bottom: width, left: width}}
+          {:ok, %Ops.Border{color: color, top: width, right: width, bottom: width, left: width}}
         end
     end
   end
@@ -749,11 +753,13 @@ defmodule Image.Plug.Provider.Cloudflare.Options do
     end
   end
 
-  defp validate_position(top, bottom, _left, _right) when not is_nil(top) and not is_nil(bottom) do
+  defp validate_position(top, bottom, _left, _right)
+       when not is_nil(top) and not is_nil(bottom) do
     {:error, invalid("draw", "top and bottom may not both be set")}
   end
 
-  defp validate_position(_top, _bottom, left, right) when not is_nil(left) and not is_nil(right) do
+  defp validate_position(_top, _bottom, left, right)
+       when not is_nil(left) and not is_nil(right) do
     {:error, invalid("draw", "left and right may not both be set")}
   end
 

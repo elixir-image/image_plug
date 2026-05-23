@@ -26,37 +26,50 @@ defmodule Image.Plug.Provider.IIIF.RoundTripTest do
 
   describe "URL → Options round-trip via the full provider pipeline" do
     test "no transforms" do
-      assert {:ok, %Pipeline{} = parsed} = parse_iiif_url(["iiif", "3", "x.jpg", "full", "max", "0", "default.jpg"])
+      assert {:ok, %Pipeline{} = parsed} =
+               parse_iiif_url(["iiif", "3", "x.jpg", "full", "max", "0", "default.jpg"])
+
       assert parsed.output.type == :jpeg
     end
 
     test "width-only resize" do
-      assert {:ok, %Pipeline{ops: ops}} = parse_iiif_url(["iiif", "3", "x.jpg", "full", "600,", "0", "default.jpg"])
+      assert {:ok, %Pipeline{ops: ops}} =
+               parse_iiif_url(["iiif", "3", "x.jpg", "full", "600,", "0", "default.jpg"])
+
       assert %Ops.Resize{width: 600, upscale?: false} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
     end
 
     test "pixel crop" do
       url = ["iiif", "3", "x.jpg", "100,50,400,300", "max", "0", "default.jpg"]
       assert {:ok, %Pipeline{ops: ops}} = parse_iiif_url(url)
-      assert %Ops.Crop{x: 100, y: 50, width: 400, height: 300, units: :pixels} = Enum.find(ops, &match?(%Ops.Crop{}, &1))
+
+      assert %Ops.Crop{x: 100, y: 50, width: 400, height: 300, units: :pixels} =
+               Enum.find(ops, &match?(%Ops.Crop{}, &1))
     end
 
     test "all five segments combined" do
       url = ["iiif", "3", "x.jpg", "pct:25,25,50,50", "^!600,400", "45", "gray.png"]
       assert {:ok, %Pipeline{ops: ops, output: out}} = parse_iiif_url(url)
 
-      assert %Ops.Crop{units: :percent, x: 25.0, y: 25.0} = Enum.find(ops, &match?(%Ops.Crop{}, &1))
-      assert %Ops.Resize{width: 600, height: 400, fit: :contain, upscale?: true} = Enum.find(ops, &match?(%Ops.Resize{}, &1))
+      assert %Ops.Crop{units: :percent, x: 25.0, y: 25.0} =
+               Enum.find(ops, &match?(%Ops.Crop{}, &1))
+
+      assert %Ops.Resize{width: 600, height: 400, fit: :contain, upscale?: true} =
+               Enum.find(ops, &match?(%Ops.Resize{}, &1))
+
       assert %Ops.Rotate{angle: 45} = Enum.find(ops, &match?(%Ops.Rotate{}, &1))
-      assert %Ops.Adjust{saturation: 0.0} = Enum.find(ops, &match?(%Ops.Adjust{}, &1))
+      assert %Ops.Adjust{saturation: s} = Enum.find(ops, &match?(%Ops.Adjust{}, &1))
+      assert s == 0.0
       assert out.type == :png
     end
   end
 
   describe "properties — every URL parses to a Pipeline" do
     property "any well-formed size segment yields an :ok parse" do
-      check all width <- integer(50..2000),
-                upscale_prefix <- member_of(["", "^"]) do
+      check all(
+              width <- integer(50..2000),
+              upscale_prefix <- member_of(["", "^"])
+            ) do
         url = ["iiif", "3", "x.jpg", "full", "#{upscale_prefix}#{width},", "0", "default.jpg"]
         assert {:ok, %Pipeline{ops: ops}} = parse_iiif_url(url)
         resize = Enum.find(ops, &match?(%Ops.Resize{}, &1))
@@ -66,7 +79,7 @@ defmodule Image.Plug.Provider.IIIF.RoundTripTest do
     end
 
     property "any rotation 0..360 yields an :ok parse" do
-      check all angle <- integer(0..360) do
+      check all(angle <- integer(0..360)) do
         url = ["iiif", "3", "x.jpg", "full", "max", Integer.to_string(angle), "default.jpg"]
         assert {:ok, %Pipeline{ops: ops}} = parse_iiif_url(url)
 
@@ -79,8 +92,10 @@ defmodule Image.Plug.Provider.IIIF.RoundTripTest do
     end
 
     property "all four IIIF qualities parse cleanly" do
-      check all quality <- member_of(["default", "color", "gray", "bitonal"]),
-                format <- member_of(["jpg", "png", "webp"]) do
+      check all(
+              quality <- member_of(["default", "color", "gray", "bitonal"]),
+              format <- member_of(["jpg", "png", "webp"])
+            ) do
         url = ["iiif", "3", "x.jpg", "full", "max", "0", "#{quality}.#{format}"]
         assert {:ok, %Pipeline{ops: ops}} = parse_iiif_url(url)
 

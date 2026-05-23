@@ -75,7 +75,8 @@ defmodule Image.Plug.Signing do
 
   """
   @spec sign(String.t(), keys(), keyword()) :: String.t()
-  def sign(path, [primary_key | _] = _keys, options \\ []) when is_binary(path) and is_binary(primary_key) do
+  def sign(path, [primary_key | _] = _keys, options \\ [])
+      when is_binary(path) and is_binary(primary_key) do
     expiry_param = encode_expiry(Keyword.get(options, :expires_at))
 
     base_with_expiry =
@@ -125,7 +126,8 @@ defmodule Image.Plug.Signing do
 
   """
   @spec verify(String.t(), keys(), keyword()) :: :ok | {:error, Error.t()}
-  def verify(path_with_query, keys, options \\ []) when is_binary(path_with_query) and is_list(keys) do
+  def verify(path_with_query, keys, options \\ [])
+      when is_binary(path_with_query) and is_list(keys) do
     required? = Keyword.get(options, :required?, false)
     now = Keyword.get(options, :now, System.system_time(:second))
 
@@ -226,7 +228,9 @@ defmodule Image.Plug.Signing do
   end
 
   defp check_signature(path_without_sig, provided, keys) do
-    if Enum.any?(keys, fn key -> Plug.Crypto.secure_compare(provided, hmac(key, path_without_sig)) end) do
+    if Enum.any?(keys, fn key ->
+         Plug.Crypto.secure_compare(provided, hmac(key, path_without_sig))
+       end) do
       :ok
     else
       {:error, Error.new(:invalid_signature, "request signature does not match")}

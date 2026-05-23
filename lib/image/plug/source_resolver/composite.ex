@@ -73,8 +73,6 @@ defmodule Image.Plug.SourceResolver.Composite do
 
   defp kind_not_configured(kind) do
     {:error,
-     Error.new(:invalid_option, "no resolver configured for source kind",
-       details: %{kind: kind}
-     )}
+     Error.new(:invalid_option, "no resolver configured for source kind", details: %{kind: kind})}
   end
 end

@@ -2,14 +2,10 @@ defmodule Image.Plug.Pipeline.Interpreter do
   @moduledoc """
   Executes a normalised pipeline against an open `Vix.Vips.Image`.
 
-  M2 implements the `%Resize{}` op for every fit mode the M2 option
-  parser can produce: `:contain`, `:cover`, `:crop`, `:pad`,
-  `:scale_down`, and `:squeeze`. All other op kinds raise
-  `:not_implemented` until the milestone that adds them.
-
   The interpreter is a single `Enum.reduce_while/3` over the op list
   with one `apply_op/2` clause per op kind. There is no implicit
-  reordering — `Image.Plug.Pipeline.Normaliser` runs first.
+  reordering — `Image.Plug.Pipeline.Normaliser` runs first, so the
+  ops arrive in canonical order with no-ops already folded away.
   """
 
   alias Image.Plug.{Error, Pipeline}
@@ -115,7 +111,11 @@ defmodule Image.Plug.Pipeline.Interpreter do
     end
   end
 
-  defp apply_op(%Ops.Trim{mode: :explicit, top: top, right: right, bottom: bottom, left: left}, image, _options) do
+  defp apply_op(
+         %Ops.Trim{mode: :explicit, top: top, right: right, bottom: bottom, left: left},
+         image,
+         _options
+       ) do
     width = Image.width(image)
     height = Image.height(image)
     crop_w = max(width - left - right, 1)
@@ -383,7 +383,8 @@ defmodule Image.Plug.Pipeline.Interpreter do
 
       _ ->
         {:error,
-         Error.new(:invalid_option,
+         Error.new(
+           :invalid_option,
            "interpreter cannot run a Draw op without a :resolve_layer_source function"
          )}
     end
@@ -500,9 +501,7 @@ defmodule Image.Plug.Pipeline.Interpreter do
     target_w = w || Image.width(overlay)
     target_h = h || Image.height(overlay)
 
-    case Image.thumbnail(overlay, "#{target_w}x#{target_h}",
-           fit: thumbnail_fit_for_layer(fit)
-         ) do
+    case Image.thumbnail(overlay, "#{target_w}x#{target_h}", fit: thumbnail_fit_for_layer(fit)) do
       {:ok, _} = success -> success
       {:error, reason} -> {:error, op_error("draw layer resize", reason)}
     end

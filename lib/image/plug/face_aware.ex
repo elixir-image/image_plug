@@ -114,9 +114,12 @@ defmodule Image.Plug.FaceAware do
 
   * `{:error, :unavailable}` if `Image.FaceDetection` isn't
     loaded.
+
+  * `{:error, reason}` if `Image.crop/4`, `Image.pixelate/2`, or
+    `Image.compose/3` fails when reconstructing the result.
   """
   @spec pixelate_faces(Vimage.t(), float()) ::
-          {:ok, Vimage.t()} | {:error, :unavailable}
+          {:ok, Vimage.t()} | {:error, :unavailable | term()}
   def pixelate_faces(%Vimage{} = image, scale)
       when is_number(scale) and scale > 0.0 do
     if available?() do

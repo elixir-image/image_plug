@@ -138,7 +138,8 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   end
 
   @unsupported_keys %{
-    "t" => "cloudinary named transformations (`t_<name>`) are server-side aliases not modelled by the IR",
+    "t" =>
+      "cloudinary named transformations (`t_<name>`) are server-side aliases not modelled by the IR",
     "u" => "cloudinary underlay `u_` is not implemented in v0.1",
     "if" => "cloudinary conditional transforms (`if_...`) are not implemented in v0.1",
     "vc" => "cloudinary video codec `vc_` is video-only",
@@ -235,7 +236,9 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
     {:ok, pipeline}
   end
 
-  defp apply_focal_point(%{resize: %Ops.Resize{gravity: :focalpoint} = resize, focal_point: fp} = acc)
+  defp apply_focal_point(
+         %{resize: %Ops.Resize{gravity: :focalpoint} = resize, focal_point: fp} = acc
+       )
        when not is_nil(fp.x) and not is_nil(fp.y) do
     %{acc | resize: %{resize | gravity: {:xy, fp.x, fp.y}}}
   end
@@ -558,7 +561,8 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
 
       :error ->
         {:error,
-         Error.new(:unsupported_option,
+         Error.new(
+           :unsupported_option,
            "cloudinary `cs_#{value}` not implemented. " <>
              "Custom-ICC profiles (Adobe RGB, ProPhoto, etc.) need an `Ops.IccTransform{}` " <>
              "op constructed programmatically with `profile: \"path/to/profile.icc\"` — " <>
@@ -625,9 +629,15 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
     end
   end
 
-  defp apply_effect("brightness", value, acc), do: adjust_effect(:brightness, value, acc, "e_brightness")
-  defp apply_effect("contrast", value, acc), do: adjust_effect(:contrast, value, acc, "e_contrast")
-  defp apply_effect("saturation", value, acc), do: adjust_effect(:saturation, value, acc, "e_saturation")
+  defp apply_effect("brightness", value, acc),
+    do: adjust_effect(:brightness, value, acc, "e_brightness")
+
+  defp apply_effect("contrast", value, acc),
+    do: adjust_effect(:contrast, value, acc, "e_contrast")
+
+  defp apply_effect("saturation", value, acc),
+    do: adjust_effect(:saturation, value, acc, "e_saturation")
+
   defp apply_effect("gamma", value, acc), do: adjust_effect(:gamma, value, acc, "e_gamma")
 
   defp apply_effect(grayscale, _, acc) when grayscale in ~w(grayscale greyscale) do

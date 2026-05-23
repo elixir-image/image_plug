@@ -92,8 +92,7 @@ defmodule Image.Plug.Integration.ImgixTest do
             {Image.Plug,
              [
                provider:
-                 {Image.Plug.Provider.Imgix,
-                  signing: %{keys: @signing_keys, required?: true}},
+                 {Image.Plug.Provider.Imgix, signing: %{keys: @signing_keys, required?: true}},
                source_resolver: {Image.Plug.SourceResolver.File, root: @fixtures},
                on_error: :status_text
              ]},

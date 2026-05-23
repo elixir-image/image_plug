@@ -111,7 +111,9 @@ defmodule Image.Plug.VariantStore.Persistence.File do
     false
   end
 
-  defp persistable?(%Variant{options: options}) when is_binary(options) and options != "", do: true
+  defp persistable?(%Variant{options: options}) when is_binary(options) and options != "",
+    do: true
+
   defp persistable?(_other), do: false
 
   defp to_json_map(%Variant{} = variant) do
@@ -183,9 +185,7 @@ defmodule Image.Plug.VariantStore.Persistence.File do
   end
 
   defp decode_variant(other, _provider) do
-    Logger.warning(
-      "image_plug: skipping malformed persisted variant entry: #{inspect(other)}"
-    )
+    Logger.warning("image_plug: skipping malformed persisted variant entry: #{inspect(other)}")
 
     []
   end

@@ -49,7 +49,8 @@ defmodule Image.Plug.Integration.OnErrorTest do
     test "unknown option also produces a placeholder PNG" do
       base_url = start_plug(:render_error_image)
 
-      {:ok, response} = Req.get(base_url <> "/cdn-cgi/image/wat=1/portrait.jpg", decode_body: false)
+      {:ok, response} =
+        Req.get(base_url <> "/cdn-cgi/image/wat=1/portrait.jpg", decode_body: false)
 
       assert response.status == 200
       assert response.headers["content-type"] == ["image/png; charset=utf-8"]

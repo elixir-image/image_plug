@@ -114,8 +114,11 @@ defmodule Image.Plug.Provider.Cloudflare.URL do
     decoded = Enum.map(path_info, &URI.decode/1)
 
     case strip_prefix(decoded, mount_segments) do
-      {:ok, segments} -> dispatch(segments, hosted_hash)
-      :error -> {:error, Error.new(:malformed_url, "request path does not match the configured mount")}
+      {:ok, segments} ->
+        dispatch(segments, hosted_hash)
+
+      :error ->
+        {:error, Error.new(:malformed_url, "request path does not match the configured mount")}
     end
   end
 

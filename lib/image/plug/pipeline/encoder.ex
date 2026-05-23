@@ -39,9 +39,9 @@ defmodule Image.Plug.Pipeline.Encoder do
 
   ### Format support
 
-  M3 supports JPEG, baseline JPEG, PNG, WebP, AVIF, the
-  Accept-driven `:auto` selection, and the small `:json` metadata
-  endpoint.
+  Supports JPEG (baseline + progressive), PNG, WebP, AVIF, TIFF,
+  JP2, GIF, PDF, the Accept-driven `:auto` selection, and the
+  small `:json` metadata endpoint.
 
   ### AVIF fallback
 

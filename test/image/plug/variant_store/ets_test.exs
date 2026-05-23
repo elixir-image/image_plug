@@ -15,9 +15,7 @@ defmodule Image.Plug.VariantStore.ETSTest do
     table = :"variants_test_#{System.unique_integer([:positive])}"
     name = :"#{table}_server"
 
-    start_supervised!(
-      {Image.Plug.VariantStore.ETS.Server, name: name, table: table, seed: []}
-    )
+    start_supervised!({Image.Plug.VariantStore.ETS.Server, name: name, table: table, seed: []})
 
     %{table: table, server: name}
   end

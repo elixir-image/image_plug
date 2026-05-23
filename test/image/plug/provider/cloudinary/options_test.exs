@@ -103,9 +103,7 @@ defmodule Image.Plug.Provider.Cloudinary.OptionsTest do
                   }
                 ]
               }} =
-               Options.parse(
-                 "e_brightness:20,e_contrast:10,e_saturation:-50,e_gamma:-10"
-               )
+               Options.parse("e_brightness:20,e_contrast:10,e_saturation:-50,e_gamma:-10")
     end
 
     test "e_grayscale sets adjust.saturation to 0" do

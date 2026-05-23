@@ -74,7 +74,7 @@ defmodule Image.Plug.Options do
 
   * `:variant_store` — `{module, options}` for an
     `Image.Plug.VariantStore` implementation. Defaults to
-    `{Image.Plug.VariantStore.ETS, []}` (not yet shipped in M1).
+    `{Image.Plug.VariantStore.ETS, []}`.
 
   * `:on_error` — error policy atom or `{:status, code}` tuple.
     Defaults to `:auto`.
@@ -147,7 +147,8 @@ defmodule Image.Plug.Options do
     if Enum.all?(keys, &is_binary/1) do
       Map.put_new(signing, :required?, false)
     else
-      raise ArgumentError, "Image.Plug: :signing :keys must all be binaries, got: #{inspect(keys)}"
+      raise ArgumentError,
+            "Image.Plug: :signing :keys must all be binaries, got: #{inspect(keys)}"
     end
   end
 
