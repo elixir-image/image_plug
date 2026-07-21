@@ -181,7 +181,7 @@ defmodule Image.Plug.Pipeline.Interpreter do
   # ---------- Background ----------
 
   defp apply_op(%Ops.Background{color: color}, image, _options) do
-    case Image.flatten(image, background_color: color) do
+    case Image.flatten(image, background: color) do
       {:ok, _} = success -> success
       {:error, reason} -> {:error, op_error("background", reason)}
     end
@@ -578,7 +578,7 @@ defmodule Image.Plug.Pipeline.Interpreter do
     case Image.embed(image, width, height,
            x: border.left,
            y: border.top,
-           background_color: border.color
+           background: border.color
          ) do
       {:ok, _} = success -> success
       {:error, reason} -> {:error, op_error("border", reason)}
@@ -758,7 +758,7 @@ defmodule Image.Plug.Pipeline.Interpreter do
   defp clamp_offset(value, _max), do: value
 
   defp maybe_pad(%Ops.Resize{fit: :pad}, image, width, height) do
-    case Image.embed(image, width, height, background_color: :white) do
+    case Image.embed(image, width, height, background: :white) do
       {:ok, _} = success ->
         success
 

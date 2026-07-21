@@ -2,11 +2,15 @@
 
 All notable changes to this project will be documented in this file. See [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
+## [v0.2.0] — 2026-07-22
+
+### Changed
+
+* Requires `image ~> 0.72` and adopts its unified `:background` option (replacing the removed `:background_color`) in the background, border and pad pipeline operations.
 
 ### Fixed
 
-* `Image.Plug` now passes through requests whose URL the provider does not recognise as an image request, returning the connection untouched and un-halted so the host application's remaining plugs handle it. This applies uniformly across all bundled providers (Cloudflare, imgix, Cloudinary, ImageKit and IIIF): a request only errors when its URL names the provider's image grammar but is malformed. Previously every non-image URL produced an error response, so mounting `plug Image.Plug` ahead of a Phoenix router intercepted all routes.
+* `Image.Plug` now passes through requests whose URL the provider does not recognise as an image request, returning the connection untouched and un-halted so the host application's remaining plugs handle it. This applies uniformly across all bundled providers (Cloudflare, imgix, Cloudinary, ImageKit and IIIF): a request only errors when its URL names the provider's image grammar but is malformed. Previously every non-image URL produced an error response, so mounting `plug Image.Plug` ahead of a Phoenix router intercepted all routes. Thanks to @sntran for the report. Closes #2.
 
 * `Image.Plug` now halts the connection after sending a response. Previously a served or errored request left the connection un-halted, so a following plug in an endpoint pipeline sent again and raised `Plug.Conn.AlreadySentError`.
 

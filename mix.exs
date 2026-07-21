@@ -1,7 +1,7 @@
 defmodule Image.Plug.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/elixir-image/image_plug"
 
   def project do
@@ -37,7 +37,7 @@ defmodule Image.Plug.MixProject do
   defp deps do
     [
       {:plug, "~> 1.16"},
-      {:image, "~> 0.67"},
+      {:image, "~> 0.72"},
       {:vix, "~> 0.38"},
       {:telemetry, "~> 1.2"},
       {:req, "~> 0.5", optional: true},
