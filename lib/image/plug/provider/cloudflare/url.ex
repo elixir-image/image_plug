@@ -76,8 +76,14 @@ defmodule Image.Plug.Provider.Cloudflare.URL do
 
   * `{:ok, recognised}` on a successful match.
 
-  * `{:error, %Image.Plug.Error{tag: :malformed_url}}` when the
-    path does not match either form.
+  * `:unrecognised` when the path is not addressed to this plug —
+    it is not under the configured mount, or carries neither the
+    `cdn-cgi/image` marker nor a configured hosted-account hash. The
+    caller should pass the request through untouched.
+
+  * `{:error, %Image.Plug.Error{tag: :malformed_url}}` when the URL
+    carries the `cdn-cgi/image` marker but is otherwise malformed
+    (for example a missing source segment).
 
   * `{:error, %Image.Plug.Error{tag: :invalid_option}}` when the
     source segment is malformed.
@@ -106,7 +112,7 @@ defmodule Image.Plug.Provider.Cloudflare.URL do
 
   """
   @spec parse(Plug.Conn.t(), keyword()) ::
-          {:ok, recognised()} | {:error, Error.t()}
+          {:ok, recognised()} | :unrecognised | {:error, Error.t()}
   def parse(%Plug.Conn{path_info: path_info}, options) when is_list(options) do
     mount_segments = mount_segments(Keyword.get(options, :mount, ""))
     hosted_hash = Keyword.get(options, :hosted_account_hash)
@@ -118,7 +124,10 @@ defmodule Image.Plug.Provider.Cloudflare.URL do
         dispatch(segments, hosted_hash)
 
       :error ->
-        {:error, Error.new(:malformed_url, "request path does not match the configured mount")}
+        # The request path is not under the configured mount, so it is
+        # not addressed to this plug at all. Signal a passthrough rather
+        # than an error so the host application's remaining plugs run.
+        :unrecognised
     end
   end
 
@@ -139,8 +148,19 @@ defmodule Image.Plug.Provider.Cloudflare.URL do
     parse_hosted_tail(hash, image_id, [])
   end
 
+  # The `cdn-cgi/image` marker is present but the URL did not match the
+  # well-formed remote clause above (for example a missing source
+  # segment). The caller clearly intended an image request, so this is a
+  # genuine error rather than a passthrough.
+  defp dispatch([@cdn_cgi_marker, @cdn_cgi_kind | _], _hosted_hash) do
+    {:error, Error.new(:malformed_url, "cdn-cgi/image URL is missing a source segment")}
+  end
+
+  # No recognised marker and no hosted-hash match: the URL is not
+  # addressed to this plug. Signal a passthrough so the host
+  # application handles the request.
   defp dispatch(_segments, _hosted_hash) do
-    {:error, Error.new(:malformed_url, "URL does not match any Cloudflare form")}
+    :unrecognised
   end
 
   defp parse_hosted_tail(hash, image_id, segments) do

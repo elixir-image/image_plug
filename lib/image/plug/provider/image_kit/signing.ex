@@ -74,9 +74,8 @@ defmodule Image.Plug.Provider.ImageKit.Signing do
         :ok
 
       {provided, path_without_sig} ->
-        with :ok <- check_expiry(path_without_sig, now),
-             :ok <- check_signature(path_without_sig, provided, keys) do
-          :ok
+        with :ok <- check_expiry(path_without_sig, now) do
+          check_signature(path_without_sig, provided, keys)
         end
     end
   end

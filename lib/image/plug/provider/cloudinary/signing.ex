@@ -124,10 +124,13 @@ defmodule Image.Plug.Provider.Cloudinary.Signing do
   end
 
   defp check_signature(transforms_and_source, provided, keys) do
-    if Enum.any?(keys, fn key ->
-         expected = compute_signature(transforms_and_source, key)
-         Plug.Crypto.secure_compare(provided, expected)
-       end) do
+    matches? =
+      Enum.any?(keys, fn key ->
+        expected = compute_signature(transforms_and_source, key)
+        Plug.Crypto.secure_compare(provided, expected)
+      end)
+
+    if matches? do
       :ok
     else
       {:error, Error.new(:invalid_signature, "request signature does not match")}

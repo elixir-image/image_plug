@@ -64,13 +64,11 @@ defmodule Image.Plug.Pipeline.EncoderTest do
           source_content_type: "image/jpeg"
         )
 
-      cond do
-        Image.Plug.Capabilities.avif_write?() ->
-          assert {:ok, _body, "image/avif"} = result
-
-        true ->
-          # AVIF unsupported -> falls through to WebP via the soft fallback.
-          assert {:ok, _body, "image/webp", _headers} = result
+      if Image.Plug.Capabilities.avif_write?() do
+        assert {:ok, _body, "image/avif"} = result
+      else
+        # AVIF unsupported -> falls through to WebP via the soft fallback.
+        assert {:ok, _body, "image/webp", _headers} = result
       end
     end
 

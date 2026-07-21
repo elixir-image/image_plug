@@ -43,16 +43,16 @@ defmodule Image.Plug.Provider.Cloudflare.URLTest do
                URL.parse(conn, mount: "/img")
     end
 
-    test "rejects requests not under :mount" do
+    test "is unrecognised when the request is not under :mount" do
       conn = build_conn("/something/else/cdn-cgi/image/width=200/foo.jpg")
 
-      assert {:error, %Error{tag: :malformed_url}} = URL.parse(conn, mount: "/img")
+      assert :unrecognised = URL.parse(conn, mount: "/img")
     end
 
-    test "rejects requests not matching /cdn-cgi/image/" do
+    test "is unrecognised when the path has no cdn-cgi/image marker" do
       conn = build_conn("/some/other/path.jpg")
 
-      assert {:error, %Error{tag: :malformed_url}} = URL.parse(conn, [])
+      assert :unrecognised = URL.parse(conn, [])
     end
 
     test "rejects empty options" do
@@ -93,17 +93,16 @@ defmodule Image.Plug.Provider.Cloudflare.URLTest do
                URL.parse(conn, hosted_account_hash: "acct123")
     end
 
-    test "rejects URL when account hash does not match config" do
+    test "is unrecognised when the account hash does not match config" do
       conn = build_conn("/wrongacct/img456/thumbnail")
 
-      assert {:error, %Error{tag: :malformed_url}} =
-               URL.parse(conn, hosted_account_hash: "acct123")
+      assert :unrecognised = URL.parse(conn, hosted_account_hash: "acct123")
     end
 
     test "hosted form is unrecognised when :hosted_account_hash is unset" do
       conn = build_conn("/acct123/img456/thumbnail")
 
-      assert {:error, %Error{tag: :malformed_url}} = URL.parse(conn, [])
+      assert :unrecognised = URL.parse(conn, [])
     end
   end
 end

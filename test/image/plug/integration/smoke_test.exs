@@ -16,7 +16,9 @@ defmodule Image.Plug.Integration.SmokeTest do
   end
 
   test "malformed URL surfaces the error tag at the wire", %{base_url: base_url} do
-    assert {:ok, response} = request("/wrong/path.jpg", base_url: base_url)
+    # A cdn-cgi/image URL missing its source segment is a genuine
+    # malformed image request (a non-image path passes through instead).
+    assert {:ok, response} = request("/cdn-cgi/image/width=50", base_url: base_url)
     assert response.status == 400
     assert response.headers["x-image-plug-error"] == ["malformed_url"]
   end

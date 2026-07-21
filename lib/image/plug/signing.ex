@@ -139,9 +139,8 @@ defmodule Image.Plug.Signing do
         :ok
 
       {provided_signature, path_without_sig} ->
-        with :ok <- check_expiry(path_without_sig, now),
-             :ok <- check_signature(path_without_sig, provided_signature, keys) do
-          :ok
+        with :ok <- check_expiry(path_without_sig, now) do
+          check_signature(path_without_sig, provided_signature, keys)
         end
     end
   end

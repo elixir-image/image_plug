@@ -27,6 +27,19 @@ defmodule Image.Plug.SourceResolver.File do
 
   alias Image.Plug.{Error, Source}
 
+  @content_types %{
+    ".jpg" => "image/jpeg",
+    ".jpeg" => "image/jpeg",
+    ".png" => "image/png",
+    ".webp" => "image/webp",
+    ".avif" => "image/avif",
+    ".gif" => "image/gif",
+    ".svg" => "image/svg+xml",
+    ".tif" => "image/tiff",
+    ".tiff" => "image/tiff",
+    ".heic" => "image/heic"
+  }
+
   @impl Image.Plug.SourceResolver
   def load(%Source{kind: :path, ref: ref} = _source, options) when is_binary(ref) do
     with {:ok, root} <- fetch_root(options),
@@ -150,19 +163,8 @@ defmodule Image.Plug.SourceResolver.File do
   end
 
   defp content_type_for(path) do
-    case Path.extname(path) |> String.downcase() do
-      ".jpg" -> "image/jpeg"
-      ".jpeg" -> "image/jpeg"
-      ".png" -> "image/png"
-      ".webp" -> "image/webp"
-      ".avif" -> "image/avif"
-      ".gif" -> "image/gif"
-      ".svg" -> "image/svg+xml"
-      ".tif" -> "image/tiff"
-      ".tiff" -> "image/tiff"
-      ".heic" -> "image/heic"
-      _ -> "application/octet-stream"
-    end
+    ext = path |> Path.extname() |> String.downcase()
+    Map.get(@content_types, ext, "application/octet-stream")
   end
 
   defp mtime_to_unix(unix) when is_integer(unix), do: unix

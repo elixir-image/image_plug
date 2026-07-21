@@ -161,12 +161,10 @@ defmodule Image.Plug.Provider.ImageKit.URL do
   end
 
   defp build_source([single]) do
-    cond do
-      String.starts_with?(single, "http://") or String.starts_with?(single, "https://") ->
-        Source.url(single)
-
-      true ->
-        Source.path("/" <> single)
+    if String.starts_with?(single, "http://") or String.starts_with?(single, "https://") do
+      Source.url(single)
+    else
+      Source.path("/" <> single)
     end
   end
 

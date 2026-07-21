@@ -562,12 +562,10 @@ defmodule Image.Plug.Pipeline.Interpreter do
        }) do
     base = [replace_with: to, blend: blend?]
 
-    cond do
-      not is_nil(less_than) and not is_nil(greater_than) ->
-        [{:less_than, less_than}, {:greater_than, greater_than} | base]
-
-      true ->
-        [{:color, from}, {:threshold, threshold} | base]
+    if not is_nil(less_than) and not is_nil(greater_than) do
+      [{:less_than, less_than}, {:greater_than, greater_than} | base]
+    else
+      [{:color, from}, {:threshold, threshold} | base]
     end
   end
 

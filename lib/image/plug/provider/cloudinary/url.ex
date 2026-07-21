@@ -138,30 +138,28 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
 
   defp split_path([account, resource_type, delivery | rest], expected_account)
        when rest != [] do
-    cond do
-      expected_account != nil and account != expected_account ->
-        {:error,
-         Error.new(:malformed_url, "cloudinary account segment does not match configured value",
-           details: %{got: account, expected: expected_account}
-         )}
+    if expected_account != nil and account != expected_account do
+      {:error,
+       Error.new(:malformed_url, "cloudinary account segment does not match configured value",
+         details: %{got: account, expected: expected_account}
+       )}
+    else
+      {signature, after_signature} = pop_signature(rest)
+      {transform_stages, source_segments} = split_transforms_and_source(after_signature)
 
-      true ->
-        {signature, after_signature} = pop_signature(rest)
-        {transform_stages, source_segments} = split_transforms_and_source(after_signature)
-
-        if source_segments == [] do
-          {:error, Error.new(:malformed_url, "cloudinary URL has no source segment")}
-        else
-          {:ok,
-           %{
-             account: account,
-             resource_type: resource_type,
-             delivery: delivery,
-             signature: signature,
-             transform_stages: transform_stages,
-             source_segments: source_segments
-           }}
-        end
+      if source_segments == [] do
+        {:error, Error.new(:malformed_url, "cloudinary URL has no source segment")}
+      else
+        {:ok,
+         %{
+           account: account,
+           resource_type: resource_type,
+           delivery: delivery,
+           signature: signature,
+           transform_stages: transform_stages,
+           source_segments: source_segments
+         }}
+      end
     end
   end
 
@@ -242,12 +240,10 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
           other
       end
 
-    cond do
-      String.starts_with?(joined, "http://") or String.starts_with?(joined, "https://") ->
-        Source.url(joined)
-
-      true ->
-        Source.path("/" <> Enum.join(segments, "/"))
+    if String.starts_with?(joined, "http://") or String.starts_with?(joined, "https://") do
+      Source.url(joined)
+    else
+      Source.path("/" <> Enum.join(segments, "/"))
     end
   end
 

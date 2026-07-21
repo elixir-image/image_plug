@@ -534,13 +534,11 @@ defmodule Image.Plug.Provider.ImageKit.Options do
 
   defp apply_entry("rt", value, acc, _strict?) do
     with {:ok, angle} <- parse_int("rt", value) do
-      cond do
-        rem(angle, 90) == 0 ->
-          op = %Ops.Rotate{angle: rem(angle, 360)}
-          {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
-
-        true ->
-          {:error, invalid("rt", value)}
+      if rem(angle, 90) == 0 do
+        op = %Ops.Rotate{angle: rem(angle, 360)}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+      else
+        {:error, invalid("rt", value)}
       end
     end
   end

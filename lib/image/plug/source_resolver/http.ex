@@ -39,6 +39,19 @@ defmodule Image.Plug.SourceResolver.HTTP do
 
   alias Image.Plug.{Error, Source}
 
+  @content_types %{
+    ".jpg" => "image/jpeg",
+    ".jpeg" => "image/jpeg",
+    ".png" => "image/png",
+    ".webp" => "image/webp",
+    ".avif" => "image/avif",
+    ".gif" => "image/gif",
+    ".svg" => "image/svg+xml",
+    ".tif" => "image/tiff",
+    ".tiff" => "image/tiff",
+    ".heic" => "image/heic"
+  }
+
   @impl Image.Plug.SourceResolver
   def load(%Source{kind: :url, ref: url}, options) when is_binary(url) do
     with :ok <- ensure_req_loaded(),
@@ -108,18 +121,7 @@ defmodule Image.Plug.SourceResolver.HTTP do
   end
 
   defp content_type_for(url) do
-    case url |> URI.parse() |> Map.get(:path, "") |> Path.extname() |> String.downcase() do
-      ".jpg" -> "image/jpeg"
-      ".jpeg" -> "image/jpeg"
-      ".png" -> "image/png"
-      ".webp" -> "image/webp"
-      ".avif" -> "image/avif"
-      ".gif" -> "image/gif"
-      ".svg" -> "image/svg+xml"
-      ".tif" -> "image/tiff"
-      ".tiff" -> "image/tiff"
-      ".heic" -> "image/heic"
-      _ -> "application/octet-stream"
-    end
+    ext = url |> URI.parse() |> Map.get(:path, "") |> Path.extname() |> String.downcase()
+    Map.get(@content_types, ext, "application/octet-stream")
   end
 end

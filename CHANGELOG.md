@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Fixed
+
+* `Image.Plug` now passes through requests whose URL the provider does not recognise as an image request, returning the connection untouched and un-halted so the host application's remaining plugs handle it. Previously every non-image URL produced an error response, so mounting `plug Image.Plug` at the root of a Phoenix endpoint intercepted all routes.
+
+* `Image.Plug` now halts the connection after sending a response. Previously a served or errored request left the connection un-halted, so a following plug in an endpoint pipeline sent again and raised `Plug.Conn.AlreadySentError`.
+
 ## [v0.1.0] — 2026-05-23
 
 ### Adds

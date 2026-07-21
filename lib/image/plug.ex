@@ -7,6 +7,23 @@ defmodule Image.Plug do
   `Plug.Router`, or `plug Image.Plug, [...]` from a Phoenix
   endpoint).
 
+  ### Passthrough
+
+  A request whose URL the configured provider does not recognise as an
+  image request is passed through untouched: the plug returns the
+  connection un-halted and unsent so the host application's remaining
+  plugs handle it. This makes `plug Image.Plug` safe to mount at the
+  root of a Phoenix endpoint ahead of your router — only genuine image
+  URLs are claimed; everything else flows on. A URL that clearly
+  intends an image request but is malformed still produces an error
+  response.
+
+  When the plug is mounted as the *sole* plug of a standalone server
+  (for example a Bandit `plug:` entry with nothing downstream), an
+  unrecognised URL has nowhere to pass through to; add a fallback
+  route (e.g. a `Plug.Router` `match _` that returns 404) if you need
+  to serve non-image paths from the same endpoint.
+
   ### Request lifecycle
 
   Each request flows through:
@@ -73,11 +90,21 @@ defmodule Image.Plug do
     try do
       result =
         case run(conn, options) do
-          {:ok, conn} ->
+          # The request is not addressed to this plug. Return the conn
+          # untouched and un-halted so the host application's remaining
+          # plugs handle it. This is what makes `plug Image.Plug` safe to
+          # mount at the root of a Phoenix endpoint.
+          :skip ->
             conn
 
+          # A response was sent, so the conn must be halted; otherwise a
+          # following plug in an endpoint pipeline sends again and raises
+          # `Plug.Conn.AlreadySentError`.
+          {:ok, conn} ->
+            Plug.Conn.halt(conn)
+
           {:error, %Error{} = error, context} ->
-            respond_error(conn, error, options, context)
+            Plug.Conn.halt(respond_error(conn, error, options, context))
         end
 
       stop_metadata =
@@ -110,15 +137,23 @@ defmodule Image.Plug do
   end
 
   defp run(conn, options) do
-    with :ok <- verify_signature(conn, options) |> wrap_unit(),
-         {:ok, parsed} <- wrap(options.provider.parse(conn, options.provider_options)) do
-      case parsed do
-        {:info, kind, source} ->
-          run_info(conn, kind, source, options)
+    with {:ok, parsed} <- wrap(options.provider.parse(conn, options.provider_options)) do
+      dispatch_parsed(conn, parsed, options)
+    end
+  end
 
-        _ ->
-          run_render(conn, parsed, options)
-      end
+  # Passthrough: the provider did not recognise the URL as its own.
+  defp dispatch_parsed(_conn, :skip, _options), do: :skip
+
+  defp dispatch_parsed(conn, {:info, kind, source}, options) do
+    with :ok <- verify_signature(conn, options) |> wrap_unit() do
+      run_info(conn, kind, source, options)
+    end
+  end
+
+  defp dispatch_parsed(conn, parsed, options) do
+    with :ok <- verify_signature(conn, options) |> wrap_unit() do
+      run_render(conn, parsed, options)
     end
   end
 
@@ -234,22 +269,9 @@ defmodule Image.Plug do
          meta
        ) do
     cond do
-      Image.Plug.Capabilities.avif_write?() and is_binary(accept) and
-          String.contains?(accept, "image/avif") ->
-        :avif
-
-      is_binary(accept) and
-          (String.contains?(accept, "image/webp") or String.contains?(accept, "image/*") or
-             String.contains?(accept, "*/*")) ->
-        :webp
-
-      true ->
-        case Map.get(meta, :content_type, "image/jpeg") do
-          "image/png" -> :png
-          "image/webp" -> :webp
-          "image/avif" -> :avif
-          _ -> :jpeg
-        end
+      accepts_avif?(accept) -> :avif
+      accepts_webp?(accept) -> :webp
+      true -> format_from_meta(meta)
     end
   end
 
@@ -259,6 +281,26 @@ defmodule Image.Plug do
          _meta
        ),
        do: type
+
+  defp accepts_avif?(accept) do
+    Image.Plug.Capabilities.avif_write?() and is_binary(accept) and
+      String.contains?(accept, "image/avif")
+  end
+
+  defp accepts_webp?(accept) do
+    is_binary(accept) and
+      (String.contains?(accept, "image/webp") or String.contains?(accept, "image/*") or
+         String.contains?(accept, "*/*"))
+  end
+
+  defp format_from_meta(meta) do
+    case Map.get(meta, :content_type, "image/jpeg") do
+      "image/png" -> :png
+      "image/webp" -> :webp
+      "image/avif" -> :avif
+      _ -> :jpeg
+    end
+  end
 
   defp normalise_encode({:ok, body, content_type}), do: {:ok, body, content_type, []}
 
@@ -434,7 +476,7 @@ defmodule Image.Plug do
   defp resolved_on_error(:auto) do
     env =
       Application.get_env(:image_plug, :env) ||
-        (Code.ensure_loaded?(Mix) && function_exported?(Mix, :env, 0) && apply(Mix, :env, []))
+        (Code.ensure_loaded?(Mix) && function_exported?(Mix, :env, 0) && Mix.env())
 
     if env == :prod, do: :fallback_to_source, else: :render_error_image
   end

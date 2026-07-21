@@ -112,16 +112,14 @@ defmodule Image.Plug.Provider.Imgix.URL do
   end
 
   defp build_source([first | _rest] = segments) do
-    cond do
-      # A single segment that decodes to an http(s) URL is a web
-      # proxy source. Imgix's convention is to percent-encode the
-      # entire URL into one path segment.
-      length(segments) == 1 and
-          (String.starts_with?(first, "http://") or String.starts_with?(first, "https://")) ->
-        Source.url(first)
-
-      true ->
-        Source.path("/" <> Enum.join(segments, "/"))
+    # A single segment that decodes to an http(s) URL is a web proxy
+    # source. Imgix's convention is to percent-encode the entire URL
+    # into one path segment.
+    if length(segments) == 1 and
+         (String.starts_with?(first, "http://") or String.starts_with?(first, "https://")) do
+      Source.url(first)
+    else
+      Source.path("/" <> Enum.join(segments, "/"))
     end
   end
 end

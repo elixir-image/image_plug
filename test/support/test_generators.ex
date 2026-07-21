@@ -155,7 +155,7 @@ defmodule Image.Plug.TestGenerators do
   end
 
   defp encode_pairs(pairs) do
-    pairs |> Enum.map(fn {k, v} -> "#{k}=#{v}" end) |> Enum.join(",")
+    Enum.map_join(pairs, ",", fn {k, v} -> "#{k}=#{v}" end)
   end
 
   # ----- vocabularies (also used by invalid generators) -----

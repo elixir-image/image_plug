@@ -139,14 +139,29 @@ defmodule Image.PlugTest do
       assert Plug.Conn.get_resp_header(conn, "x-image-plug-error") == ["source_not_found"]
     end
 
-    test "malformed URL responds with 400 :malformed_url" do
+    test "a non-image URL passes through untouched and un-halted" do
       options = build_options()
 
       conn =
         conn(:get, "/some/wrong/path.jpg")
         |> Image.Plug.call(options)
 
+      # The plug does not recognise the URL as its own, so it leaves the
+      # conn alone for the host application's remaining plugs.
+      refute conn.halted
+      assert conn.state == :unset
+      assert conn.status == nil
+    end
+
+    test "a malformed cdn-cgi URL responds with 400 :malformed_url" do
+      options = build_options()
+
+      conn =
+        conn(:get, "/cdn-cgi/image/width=100")
+        |> Image.Plug.call(options)
+
       assert conn.status == 400
+      assert conn.halted
       assert Plug.Conn.get_resp_header(conn, "x-image-plug-error") == ["malformed_url"]
     end
 
@@ -271,7 +286,7 @@ defmodule Image.PlugTest do
       options = build_options(on_error: :render_error_image)
 
       conn =
-        conn(:get, "/some/wrong/path.jpg")
+        conn(:get, "/cdn-cgi/image/width=100")
         |> Image.Plug.call(options)
 
       assert conn.status == 200
@@ -440,6 +455,70 @@ defmodule Image.PlugTest do
 
       assert conn.status == 200
       assert binary_part(conn.resp_body, 0, 3) == <<0xFF, 0xD8, 0xFF>>
+    end
+  end
+
+  describe "mounting in a Phoenix endpoint pipeline" do
+    # Simulates `plug Image.Plug` followed by another plug in an
+    # endpoint: the downstream plug only runs (and sends) when
+    # Image.Plug passed the request through un-halted. Before the
+    # passthrough/halt fix, a non-image request errored and a served
+    # image left the conn un-halted, so the downstream send raised
+    # `Plug.Conn.AlreadySentError`.
+    defp run_pipeline(conn, options) do
+      conn = Image.Plug.call(conn, options)
+
+      if conn.halted do
+        conn
+      else
+        Plug.Conn.send_resp(conn, 204, "downstream")
+      end
+    end
+
+    test "a non-image request flows to the downstream plug" do
+      conn = run_pipeline(conn(:get, "/"), build_options())
+
+      assert conn.status == 204
+      assert conn.resp_body == "downstream"
+    end
+
+    test "an unrelated nested path flows to the downstream plug" do
+      conn = run_pipeline(conn(:get, "/users/42/edit"), build_options())
+
+      assert conn.status == 204
+    end
+
+    test "a served image halts before the downstream plug" do
+      conn =
+        run_pipeline(
+          conn(:get, "/cdn-cgi/image/width=50,format=jpeg/sample.jpg"),
+          build_options()
+        )
+
+      assert conn.halted
+      assert conn.status == 200
+      refute conn.resp_body == "downstream"
+    end
+
+    test "a malformed image request errors and halts, no downstream send" do
+      conn = run_pipeline(conn(:get, "/cdn-cgi/image/width=50"), build_options())
+
+      assert conn.halted
+      assert conn.status == 400
+      assert Plug.Conn.get_resp_header(conn, "x-image-plug-error") == ["malformed_url"]
+    end
+
+    test "with a mount prefix, only requests under it are claimed" do
+      options = build_options(provider: {Image.Plug.Provider.Cloudflare, mount: "/img"})
+
+      passthrough = run_pipeline(conn(:get, "/dashboard"), options)
+      assert passthrough.status == 204
+
+      served =
+        run_pipeline(conn(:get, "/img/cdn-cgi/image/width=50,format=jpeg/sample.jpg"), options)
+
+      assert served.halted
+      assert served.status == 200
     end
   end
 end

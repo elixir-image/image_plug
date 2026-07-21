@@ -41,9 +41,17 @@ defmodule Image.Plug.Provider.Cloudflare do
 
   @impl Image.Plug.Provider
   def parse(%Plug.Conn{} = conn, options) when is_list(options) do
-    with {:ok, recognised} <-
-           URL.parse(conn, Keyword.take(options, [:mount, :hosted_account_hash])) do
-      build_result(recognised, options)
+    case URL.parse(conn, Keyword.take(options, [:mount, :hosted_account_hash])) do
+      {:ok, recognised} ->
+        build_result(recognised, options)
+
+      # The URL is not addressed to this plug; ask the host application
+      # to handle the request by returning the passthrough signal.
+      :unrecognised ->
+        {:ok, :skip}
+
+      {:error, _reason} = error ->
+        error
     end
   end
 

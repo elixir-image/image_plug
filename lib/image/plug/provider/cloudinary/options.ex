@@ -112,9 +112,10 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
   defp normalise_replace_color_value("rgb:" <> hex), do: "#" <> hex
 
   defp normalise_replace_color_value(value) when is_binary(value) do
-    cond do
-      hex_color?(value) -> "#" <> value
-      true -> value
+    if hex_color?(value) do
+      "#" <> value
+    else
+      value
     end
   end
 
@@ -465,13 +466,11 @@ defmodule Image.Plug.Provider.Cloudinary.Options do
 
   defp apply_entry("a", value, acc, _strict?) do
     with {:ok, angle} <- parse_int("a", value) do
-      cond do
-        rem(angle, 90) == 0 ->
-          op = %Ops.Rotate{angle: rem(angle, 360)}
-          {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
-
-        true ->
-          {:error, invalid("a", value)}
+      if rem(angle, 90) == 0 do
+        op = %Ops.Rotate{angle: rem(angle, 360)}
+        {:ok, %{acc | appended: replace_or_append(acc.appended, op)}}
+      else
+        {:error, invalid("a", value)}
       end
     end
   end

@@ -37,6 +37,14 @@ defmodule Image.Plug.Provider do
     document (currently only `:iiif_image_info` for the IIIF Image
     API 3.0 `info.json`). The plug builds the document by reading
     the source's dimensions and serialises as JSON.
+
+  * `:skip` — the request is not addressed to this plug (its URL
+    matches none of the provider's recognised shapes). The plug
+    returns the connection untouched and un-halted so the host
+    application's remaining plugs handle it. This is what makes
+    `plug Image.Plug` safe to mount at the root of a Phoenix
+    endpoint. Reserve `{:error, ...}` for URLs that clearly *intend*
+    an image request but are malformed.
   """
   @type info_kind :: :iiif_image_info
 
@@ -45,6 +53,7 @@ defmodule Image.Plug.Provider do
           | {:variant, name :: String.t(), [override()], Source.t()}
           | {:passthrough, Source.t()}
           | {:info, info_kind(), Source.t()}
+          | :skip
 
   @doc """
   Parses a request into one of the `t:result/0` shapes.
