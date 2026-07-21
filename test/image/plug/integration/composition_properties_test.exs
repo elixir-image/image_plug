@@ -23,6 +23,10 @@ defmodule Image.Plug.Integration.CompositionPropertiesTest do
 
   import Image.Plug.TestGenerators
 
+  # Property tests run real libvips compositions per iteration and can
+  # exceed the default 60s ceiling on a loaded CI runner.
+  @moduletag timeout: 120_000
+
   property "any random valid N-key options string returns 200", %{base_url: base_url} do
     check all(
             options <- valid_options_string(4),

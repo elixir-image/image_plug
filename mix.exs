@@ -17,7 +17,7 @@ defmodule Image.Plug.MixProject do
       source_url: @source_url,
       docs: docs(),
       dialyzer: [
-        plt_add_apps: [:plug, :ex_unit],
+        plt_add_apps: [:mix, :plug, :ex_unit],
         flags: [:error_handling, :unknown, :extra_return],
         ignore_warnings: ".dialyzer_ignore.exs"
       ]
