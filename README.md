@@ -55,6 +55,8 @@ end
 
 Then a request to `https://example.com/img/cdn-cgi/image/width=600,fit=cover,format=auto/photos/sunset.jpg` resolves the source, runs the pipeline, content-negotiates the format (AVIF → WebP → JPEG fallback), and streams the result.
 
+`Image.Plug` claims only requests under the provider's `:mount` (plus, for Cloudflare, `/cdn-cgi/image/` URLs at the root). **Every other request passes through untouched** to the rest of the endpoint pipeline, so it is safe to place `plug Image.Plug` ahead of `plug MyAppWeb.Router` — your normal routes are unaffected. Give the provider a `:mount` prefix so it only intercepts image URLs. See the [usage guide](https://hexdocs.pm/image_plug/usage.html#mounting-in-phoenix) for the full routing rules.
+
 ## Variants
 
 Variants are reusable named pipelines. The hosted URL form `/<account>/<image-id>/<variant-name>` resolves against the configured `Image.Plug.VariantStore`.
@@ -130,6 +132,8 @@ For server-rendered components — `<.image>` and `<.picture>` — see the compa
 | `:max_pixels` | `25_000_000` | Soft upper bound on output pixel count. |
 | `:request_timeout` | `10_000` | Per-request budget in ms. |
 | `:telemetry_prefix` | `[:image_plug]` | Atom list prepended to telemetry event names. |
+
+The provider's own options (passed in the `{module, opts}` tuple) include the mount path. Set `mount:` to the path prefix `Image.Plug` should serve — for example `{Image.Plug.Provider.Cloudflare, mount: "/img"}`. When mounted in a Phoenix endpoint ahead of your router, requests outside that prefix pass through to the router untouched; see [Mounting in Phoenix](https://hexdocs.pm/image_plug/usage.html#mounting-in-phoenix).
 
 ## Error policy
 

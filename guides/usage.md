@@ -80,6 +80,20 @@ end
 
 Place `Image.Plug` *after* `Plug.Static` (so static assets win when their paths overlap) and *before* parsers (no body to parse on image requests).
 
+### How requests are routed
+
+`Image.Plug` handles only the requests it recognises as image requests — those under the provider's configured `:mount` (and, for the Cloudflare provider, those carrying the `/cdn-cgi/image/` marker even at the mount root). **Every other request passes straight through untouched.** The rest of your endpoint pipeline — session, parsers, and finally `MyAppWeb.Router` — then handles your normal routes exactly as it would without `image_plug`. A request to `/`, `/users/42`, or `/api/...` never touches image processing.
+
+This is what makes it safe to place `plug Image.Plug` at the top of a Phoenix endpoint, ahead of your router. Two rules follow:
+
+* **Give the provider a `:mount` prefix** (e.g. `mount: "/img"`) so it claims only URLs under that path. Without one, providers whose grammar treats every path as an image source — imgix, and ImageKit's query-string form — would try to serve `/` and every other route. The Cloudflare provider is the exception: it also recognises its `/cdn-cgi/image/` marker at the root, so `mount: ""` is safe with it.
+
+* A **genuinely malformed image URL** *under* the mount — for example `/img/cdn-cgi/image/width=600` with no source segment — is still handled by `Image.Plug`, which returns an error response per your `:on_error` policy rather than passing it through. Passthrough is for requests that are not image requests at all, not for broken ones.
+
+When `Image.Plug` does serve (or error on) a request it **halts** the connection, so nothing further in the pipeline runs for that request. When it passes through, it returns the connection untouched and un-halted, so the next plug runs normally.
+
+If you run `Image.Plug` as the *only* plug of a standalone server (a Bandit `plug:` entry with nothing after it), there is nowhere for a passed-through request to go — add a fallback route (a `Plug.Router` with `forward "/img", to: Image.Plug` and a `match _` that returns 404) if you need to serve non-image paths from the same server. Inside a Phoenix endpoint this never arises, because the router is always downstream.
+
 ## Mounting in `Plug.Router`
 
 ```elixir
