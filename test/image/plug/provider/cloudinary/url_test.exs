@@ -77,10 +77,10 @@ defmodule Image.Plug.Provider.Cloudinary.URLTest do
       assert parsed.source.ref == "/sample.jpg"
     end
 
-    test "rejects paths not under :mount" do
+    test "passes through paths not under :mount" do
       conn = build_conn("/other/demo/image/upload/sample.jpg")
 
-      assert {:error, %Error{tag: :malformed_url}} = URL.parse(conn, mount: "/img")
+      assert :unrecognised = URL.parse(conn, mount: "/img")
     end
 
     test "rejects mismatched account when :account is configured" do

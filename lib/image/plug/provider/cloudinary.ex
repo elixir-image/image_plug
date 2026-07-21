@@ -47,9 +47,20 @@ defmodule Image.Plug.Provider.Cloudinary do
 
   @impl Image.Plug.Provider
   def parse(%Plug.Conn{} = conn, options) when is_list(options) do
+    case URL.parse(conn, Keyword.take(options, [:mount, :account])) do
+      :unrecognised ->
+        {:ok, :skip}
+
+      {:ok, parsed} ->
+        build_result(conn, parsed, options)
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp build_result(conn, parsed, options) do
     with :ok <- verify_signature(conn, options),
-         {:ok, parsed} <-
-           URL.parse(conn, Keyword.take(options, [:mount, :account])),
          {:ok, pipeline} <-
            Options.parse(parsed.options, Keyword.take(options, [:strict?])) do
       # Run through the encoder whenever the URL carried any

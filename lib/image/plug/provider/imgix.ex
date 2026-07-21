@@ -46,18 +46,25 @@ defmodule Image.Plug.Provider.Imgix do
 
   @impl Image.Plug.Provider
   def parse(%Plug.Conn{} = conn, options) when is_list(options) do
-    with :ok <- verify_signature(conn, options),
-         {:ok, %{shape: :imgix, options: query_string, source: source}} <-
-           URL.parse(conn, Keyword.take(options, [:mount])),
-         {:ok, pipeline} <- Options.parse(query_string, Keyword.take(options, [:strict?])) do
-      result =
-        cond do
-          pipeline.ops != [] -> {:pipeline, pipeline, source}
-          non_default_output?(pipeline.output) -> {:pipeline, pipeline, source}
-          true -> {:passthrough, source}
+    case URL.parse(conn, Keyword.take(options, [:mount])) do
+      :unrecognised ->
+        {:ok, :skip}
+
+      {:ok, %{shape: :imgix, options: query_string, source: source}} ->
+        with :ok <- verify_signature(conn, options),
+             {:ok, pipeline} <- Options.parse(query_string, Keyword.take(options, [:strict?])) do
+          result =
+            cond do
+              pipeline.ops != [] -> {:pipeline, pipeline, source}
+              non_default_output?(pipeline.output) -> {:pipeline, pipeline, source}
+              true -> {:passthrough, source}
+            end
+
+          {:ok, result}
         end
 
-      {:ok, result}
+      {:error, _reason} = error ->
+        error
     end
   end
 

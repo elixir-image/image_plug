@@ -49,8 +49,11 @@ defmodule Image.Plug.Provider.Imgix.URL do
 
   * `{:ok, recognised}` on a successful match.
 
-  * `{:error, %Image.Plug.Error{tag: :malformed_url}}` when the
-    path does not sit under the configured mount.
+  * `:unrecognised` when the path is not under the configured mount.
+    The caller should pass the request through untouched.
+
+  * `{:error, %Image.Plug.Error{tag: :malformed_url}}` when the path
+    is under the mount but names no source.
 
   * `{:error, %Image.Plug.Error{tag: :invalid_option}}` when the
     decoded source is malformed (e.g. relative path, unparseable
@@ -71,7 +74,8 @@ defmodule Image.Plug.Provider.Imgix.URL do
       "/photos/sunset.jpg"
 
   """
-  @spec parse(Plug.Conn.t(), keyword()) :: {:ok, recognised()} | {:error, Error.t()}
+  @spec parse(Plug.Conn.t(), keyword()) ::
+          {:ok, recognised()} | :unrecognised | {:error, Error.t()}
   def parse(%Plug.Conn{path_info: path_info, query_string: query_string}, options)
       when is_list(options) do
     mount_segments = mount_segments(Keyword.get(options, :mount, ""))
@@ -87,8 +91,9 @@ defmodule Image.Plug.Provider.Imgix.URL do
         end
 
       :error ->
-        {:error,
-         Error.new(:malformed_url, "request path does not sit under the configured mount")}
+        # Not under the configured mount, so this request is not
+        # addressed to the plug. Pass it through untouched.
+        :unrecognised
     end
   end
 

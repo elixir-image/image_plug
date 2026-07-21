@@ -77,10 +77,10 @@ defmodule Image.Plug.Provider.ImageKit.URLTest do
       assert parsed.source.ref == "/sample.jpg"
     end
 
-    test "rejects paths not under :mount" do
+    test "passes through paths not under :mount" do
       conn = build_conn("/other/tr:w-200/sample.jpg")
 
-      assert {:error, %Error{tag: :malformed_url}} = URL.parse(conn, mount: "/img")
+      assert :unrecognised = URL.parse(conn, mount: "/img")
     end
   end
 

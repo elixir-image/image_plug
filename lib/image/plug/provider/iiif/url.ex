@@ -78,7 +78,8 @@ defmodule Image.Plug.Provider.IIIF.URL do
       :info_json
 
   """
-  @spec parse(Plug.Conn.t(), keyword()) :: {:ok, recognised()} | {:error, Error.t()}
+  @spec parse(Plug.Conn.t(), keyword()) ::
+          {:ok, recognised()} | :unrecognised | {:error, Error.t()}
   def parse(%Plug.Conn{path_info: path_info}, options) when is_list(options) do
     mount_segments = split_path(Keyword.get(options, :mount, ""))
     endpoint_segments = split_path(Keyword.get(options, :endpoint, "iiif/3"))
@@ -152,14 +153,12 @@ defmodule Image.Plug.Provider.IIIF.URL do
 
   defp strip_prefix(path_info, [], _label), do: {:ok, path_info}
 
-  defp strip_prefix(path_info, segments, label) do
+  defp strip_prefix(path_info, segments, _label) do
     if List.starts_with?(path_info, segments) do
       {:ok, Enum.drop(path_info, length(segments))}
     else
-      {:error,
-       Error.new(:malformed_url, "request path does not start with the configured #{label}",
-         details: %{expected: segments, got: path_info}
-       )}
+      # Not under the configured mount/endpoint: pass through.
+      :unrecognised
     end
   end
 end

@@ -81,9 +81,15 @@ defmodule Image.Plug.Provider.IIIF do
 
   @impl Image.Plug.Provider
   def parse(%Plug.Conn{} = conn, options) when is_list(options) do
-    with {:ok, recognised} <-
-           URL.parse(conn, Keyword.take(options, [:mount, :endpoint])) do
-      build_result(recognised, options)
+    case URL.parse(conn, Keyword.take(options, [:mount, :endpoint])) do
+      :unrecognised ->
+        {:ok, :skip}
+
+      {:ok, recognised} ->
+        build_result(recognised, options)
+
+      {:error, _reason} = error ->
+        error
     end
   end
 

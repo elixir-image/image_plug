@@ -75,8 +75,11 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
 
   * `{:ok, recognised}` on a successful match.
 
+  * `:unrecognised` when the path is not under the configured mount.
+    The caller should pass the request through untouched.
+
   * `{:error, %Image.Plug.Error{tag: :malformed_url}}` when the path
-    doesn't sit under the mount or has too few segments.
+    is under the mount but has too few segments.
 
   ### Examples
 
@@ -94,7 +97,8 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
       "/sample.jpg"
 
   """
-  @spec parse(Plug.Conn.t(), keyword()) :: {:ok, recognised()} | {:error, Error.t()}
+  @spec parse(Plug.Conn.t(), keyword()) ::
+          {:ok, recognised()} | :unrecognised | {:error, Error.t()}
   def parse(%Plug.Conn{path_info: path_info}, options) when is_list(options) do
     mount_segments = mount_segments(Keyword.get(options, :mount, ""))
     expected_account = Keyword.get(options, :account)
@@ -132,7 +136,8 @@ defmodule Image.Plug.Provider.Cloudinary.URL do
     if List.starts_with?(path_info, mount_segments) do
       {:ok, Enum.drop(path_info, length(mount_segments))}
     else
-      {:error, Error.new(:malformed_url, "request path does not sit under the configured mount")}
+      # Not under the configured mount: pass the request through.
+      :unrecognised
     end
   end
 

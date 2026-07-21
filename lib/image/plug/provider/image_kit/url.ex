@@ -54,9 +54,12 @@ defmodule Image.Plug.Provider.ImageKit.URL do
 
   * `{:ok, recognised}` on a successful match.
 
+  * `:unrecognised` when the path is not under the configured
+    mount/endpoint. The caller should pass the request through
+    untouched.
+
   * `{:error, %Image.Plug.Error{tag: :malformed_url}}` when the path
-    doesn't sit under the configured mount/endpoint or has no
-    source segment.
+    is under the mount/endpoint but has no source segment.
 
   ### Examples
 
@@ -72,7 +75,8 @@ defmodule Image.Plug.Provider.ImageKit.URL do
       "/sample.jpg"
 
   """
-  @spec parse(Plug.Conn.t(), keyword()) :: {:ok, recognised()} | {:error, Error.t()}
+  @spec parse(Plug.Conn.t(), keyword()) ::
+          {:ok, recognised()} | :unrecognised | {:error, Error.t()}
   def parse(%Plug.Conn{path_info: path_info, query_string: query_string}, options)
       when is_list(options) do
     mount_segments = mount_segments(Keyword.get(options, :mount, ""))
@@ -112,12 +116,12 @@ defmodule Image.Plug.Provider.ImageKit.URL do
 
   defp strip_prefix(path_info, [], _label), do: {:ok, path_info}
 
-  defp strip_prefix(path_info, segments, label) do
+  defp strip_prefix(path_info, segments, _label) do
     if List.starts_with?(path_info, segments) do
       {:ok, Enum.drop(path_info, length(segments))}
     else
-      {:error,
-       Error.new(:malformed_url, "request path does not sit under the configured #{label}")}
+      # Not under the configured mount/endpoint: pass through.
+      :unrecognised
     end
   end
 

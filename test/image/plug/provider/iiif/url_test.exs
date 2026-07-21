@@ -81,14 +81,14 @@ defmodule Image.Plug.Provider.IIIF.URLTest do
       assert parsed.kind == :info_json
     end
 
-    test "mount mismatch is reported as malformed_url" do
+    test "mount mismatch passes through" do
       c = conn(["other", "iiif", "3", "cat.jpg", "info.json"])
-      assert {:error, %Image.Plug.Error{tag: :malformed_url}} = URL.parse(c, mount: "/app")
+      assert :unrecognised = URL.parse(c, mount: "/app")
     end
 
-    test "endpoint mismatch is reported as malformed_url" do
+    test "endpoint mismatch passes through" do
       c = conn(["iiif", "2", "cat.jpg", "info.json"])
-      assert {:error, %Image.Plug.Error{tag: :malformed_url}} = URL.parse(c, [])
+      assert :unrecognised = URL.parse(c, [])
     end
   end
 
