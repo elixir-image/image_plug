@@ -6,9 +6,13 @@ All notable changes to this project will be documented in this file. See [Keep a
 
 ### Fixed
 
-* `Image.Plug` now passes through requests whose URL the provider does not recognise as an image request, returning the connection untouched and un-halted so the host application's remaining plugs handle it. Previously every non-image URL produced an error response, so mounting `plug Image.Plug` at the root of a Phoenix endpoint intercepted all routes.
+* `Image.Plug` now passes through requests whose URL the provider does not recognise as an image request, returning the connection untouched and un-halted so the host application's remaining plugs handle it. This applies uniformly across all bundled providers (Cloudflare, imgix, Cloudinary, ImageKit and IIIF): a request only errors when its URL names the provider's image grammar but is malformed. Previously every non-image URL produced an error response, so mounting `plug Image.Plug` ahead of a Phoenix router intercepted all routes.
 
 * `Image.Plug` now halts the connection after sending a response. Previously a served or errored request left the connection un-halted, so a following plug in an endpoint pipeline sent again and raised `Plug.Conn.AlreadySentError`.
+
+### Documentation
+
+* Documents how to mount `Image.Plug` inside a larger Phoenix router, explaining passthrough routing and the role of the provider `:mount` prefix. See the [usage guide](https://hexdocs.pm/image_plug/usage.html#mounting-in-phoenix).
 
 ## [v0.1.0] — 2026-05-23
 
