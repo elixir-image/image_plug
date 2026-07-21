@@ -103,6 +103,7 @@ defmodule Image.Plug.MixProject do
         About: ["README.md", "CHANGELOG.md"]
       ],
       source_ref: "v#{@version}",
+      formatters: ["html", "markdown"],
       groups_for_modules: [
         "Public API": [
           Image.Plug,
