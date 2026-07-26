@@ -24,6 +24,36 @@ defmodule Image.Plug do
   route (e.g. a `Plug.Router` `match _` that returns 404) if you need
   to serve non-image paths from the same endpoint.
 
+  ### Runtime configuration for releases
+
+  A Phoenix endpoint calls a plug's `init/1` at *compile time*, so
+  options passed inline to `plug Image.Plug, ...` — including a
+  provider's `:mount` path — are frozen into the compiled module and
+  cannot be read from `config/runtime.exs` or environment variables at
+  boot. To configure the plug at runtime (the usual case for an Elixir
+  release), pass `otp_app:`:
+
+      # endpoint.ex
+      plug Image.Plug, otp_app: :my_app
+
+      # config/runtime.exs
+      config :my_app, Image.Plug,
+        provider: {Image.Plug.Provider.Cloudflare, mount: System.fetch_env!("IMAGE_MOUNT")},
+        source_resolver: {Image.Plug.SourceResolver.HTTP, []}
+
+  In this mode `init/1` stores only the app reference; the full
+  configuration is read from the application environment and validated
+  on the first request, then memoized. Inline options given alongside
+  `otp_app:` act as defaults that the application-environment config
+  overrides per key. Pass `:key` to override the config key (it
+  defaults to `Image.Plug`).
+
+  Alternatively, without any `Image.Plug`-specific option, Phoenix's own
+  `config :my_app, MyAppWeb.Endpoint, plug_init_mode: :runtime` makes
+  the endpoint run every plug's `init/1` at boot, after which inline
+  `System.get_env/1` calls resolve; note that this applies to the whole
+  endpoint, not just this plug.
+
   ### Request lifecycle
 
   Each request flows through:
@@ -58,6 +88,14 @@ defmodule Image.Plug do
 
   require Logger
 
+  @typedoc """
+  Deferred configuration produced by `init/1` when the `:otp_app` option
+  is given. The full options are read from the application environment and
+  validated on the first `call/2`, so that a release can configure the plug
+  from `config/runtime.exs`.
+  """
+  @type runtime_config :: {:runtime, otp_app :: atom(), key :: atom(), defaults :: keyword()}
+
   @impl Plug
   @doc """
   Validates configuration and returns an opaque options struct passed
@@ -66,17 +104,39 @@ defmodule Image.Plug do
   Raises `ArgumentError` if required configuration is missing or
   malformed. Configuration errors are programmer errors and must surface
   at boot time, not per-request.
+
+  ### Runtime configuration
+
+  Pass `otp_app: :my_app` to read the configuration from the application
+  environment (`Application.get_env(:my_app, Image.Plug)`) on the first
+  request instead of at compile time. This is what lets an Elixir release
+  configure the plug — for example a runtime `:mount` path — from
+  `config/runtime.exs`. Any inline options are used as defaults that the
+  application-environment config overrides per key. An optional `:key`
+  overrides the config key (defaulting to `Image.Plug`). In this mode
+  configuration errors surface on the first request rather than at boot.
   """
-  @spec init(keyword()) :: Options.t()
+  @spec init(keyword()) :: Options.t() | runtime_config()
   def init(options) when is_list(options) do
-    Options.new!(options)
+    case Keyword.pop(options, :otp_app) do
+      {nil, options} ->
+        Options.new!(options)
+
+      {otp_app, options} when is_atom(otp_app) and not is_nil(otp_app) ->
+        {key, defaults} = Keyword.pop(options, :key, __MODULE__)
+        {:runtime, otp_app, key, defaults}
+    end
   end
 
   @impl Plug
   @doc """
   Handles a single request end-to-end.
   """
-  @spec call(Plug.Conn.t(), Options.t()) :: Plug.Conn.t()
+  @spec call(Plug.Conn.t(), Options.t() | runtime_config()) :: Plug.Conn.t()
+  def call(%Plug.Conn{} = conn, {:runtime, otp_app, key, defaults}) do
+    call(conn, runtime_options(otp_app, key, defaults))
+  end
+
   def call(%Plug.Conn{} = conn, %Options{} = options) do
     start_time = System.monotonic_time()
     metadata = %{request_path: conn.request_path, provider: options.provider}
@@ -126,6 +186,26 @@ defmodule Image.Plug do
         )
 
         :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
+
+  # Resolves and validates the application-environment configuration for the
+  # `:otp_app` mode, memoizing the result in `:persistent_term` so it is built
+  # once (on the first request) rather than per request. The memo key includes
+  # the inline defaults so two mounts sharing an `otp_app`/`key` but differing
+  # in their defaults do not collide.
+  defp runtime_options(otp_app, key, defaults) do
+    memo_key = {__MODULE__, :runtime_options, otp_app, key, defaults}
+
+    case :persistent_term.get(memo_key, nil) do
+      %Options{} = options ->
+        options
+
+      nil ->
+        app_config = Application.get_env(otp_app, key, [])
+        options = Options.new!(Keyword.merge(defaults, app_config))
+        :persistent_term.put(memo_key, options)
+        options
     end
   end
 

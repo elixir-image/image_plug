@@ -86,6 +86,90 @@ defmodule Image.PlugTest do
     end
   end
 
+  describe "runtime configuration (:otp_app)" do
+    test "init/1 with :otp_app defers resolution to a runtime tuple" do
+      assert {:runtime, :image_plug, Image.Plug, []} = Image.Plug.init(otp_app: :image_plug)
+    end
+
+    test "init/1 carries inline options as defaults and honours :key" do
+      assert {:runtime, :image_plug, MyConfigKey, [on_error: :status_text]} =
+               Image.Plug.init(otp_app: :image_plug, key: MyConfigKey, on_error: :status_text)
+    end
+
+    test "call/2 reads the configuration from the application env on first request" do
+      key = RuntimeConfigRoundTrip
+
+      Application.put_env(:image_plug, key,
+        provider: {Image.Plug.Provider.Cloudflare, []},
+        source_resolver: {Image.Plug.SourceResolver.File, root: @fixtures},
+        on_error: :status_text
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:image_plug, key)
+        :persistent_term.erase({Image.Plug, :runtime_options, :image_plug, key, []})
+      end)
+
+      runtime = Image.Plug.init(otp_app: :image_plug, key: key)
+
+      conn =
+        conn(:get, "/cdn-cgi/image/width=100,format=jpeg/sample.jpg")
+        |> Image.Plug.call(runtime)
+
+      assert conn.status == 200
+      assert binary_part(conn.resp_body, 0, 3) == <<0xFF, 0xD8, 0xFF>>
+    end
+
+    test "application-env config overrides inline defaults per key" do
+      key = RuntimeConfigOverride
+
+      defaults = [
+        provider: {Image.Plug.Provider.Cloudflare, []},
+        source_resolver: {Image.Plug.SourceResolver.File, root: "/nonexistent"},
+        on_error: :status_text
+      ]
+
+      # The runtime config supplies only a (valid) source resolver, which must
+      # override the inline default pointing at a nonexistent root.
+      Application.put_env(:image_plug, key,
+        source_resolver: {Image.Plug.SourceResolver.File, root: @fixtures}
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:image_plug, key)
+        :persistent_term.erase({Image.Plug, :runtime_options, :image_plug, key, defaults})
+      end)
+
+      runtime = Image.Plug.init([otp_app: :image_plug, key: key] ++ defaults)
+
+      conn =
+        conn(:get, "/cdn-cgi/image/width=100,format=jpeg/sample.jpg")
+        |> Image.Plug.call(runtime)
+
+      assert conn.status == 200
+    end
+
+    test "an invalid runtime configuration raises on the first request" do
+      key = RuntimeConfigInvalid
+
+      # :provider is missing, so Options.new! raises when resolved.
+      Application.put_env(:image_plug, key,
+        source_resolver: {Image.Plug.SourceResolver.File, root: @fixtures}
+      )
+
+      on_exit(fn ->
+        Application.delete_env(:image_plug, key)
+        :persistent_term.erase({Image.Plug, :runtime_options, :image_plug, key, []})
+      end)
+
+      runtime = Image.Plug.init(otp_app: :image_plug, key: key)
+
+      assert_raise ArgumentError, ~r/required option :provider/, fn ->
+        Image.Plug.call(conn(:get, "/cdn-cgi/image/width=100/sample.jpg"), runtime)
+      end
+    end
+  end
+
   describe "end-to-end round trip" do
     test "transforms a JPEG fixture and streams it back as a chunked WebP" do
       options = build_options()

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Added
+
+* `Image.Plug` accepts `otp_app: :my_app` to read its configuration from the application environment on the first request instead of at compile time, so an Elixir release can configure the plug (for example a runtime `:mount` path) from `config/runtime.exs`. Inline options act as defaults overridden per key; an optional `:key` overrides the config key.
+
 ## [v0.2.0] — 2026-07-22
 
 ### Changed
