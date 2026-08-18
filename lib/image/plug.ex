@@ -553,15 +553,37 @@ defmodule Image.Plug do
     end
   end
 
-  defp resolved_on_error(:auto) do
-    env =
-      Application.get_env(:image_plug, :env) ||
-        (Code.ensure_loaded?(Mix) && function_exported?(Mix, :env, 0) && Mix.env())
+  defp resolved_on_error(:auto), do: auto_policy(detect_env())
+  defp resolved_on_error(other), do: other
 
-    if env == :prod, do: :fallback_to_source, else: :render_error_image
+  # Detects the runtime environment. Returns, in priority order:
+  #
+  #   1. the value of `config :image_plug, :env, ...` when set;
+  #   2. `Mix.env/0` when Mix is loaded (interactive, dev, test);
+  #   3. `nil` — meaning "no env detected", the typical shape of a mix
+  #      release (which strips Mix by design).
+  defp detect_env do
+    cond do
+      env = Application.get_env(:image_plug, :env) -> env
+      Code.ensure_loaded?(Mix) and function_exported?(Mix, :env, 0) -> Mix.env()
+      true -> nil
+    end
   end
 
-  defp resolved_on_error(other), do: other
+  @doc false
+  # Pure mapping from detected env to a concrete error policy. Public for
+  # unit testing only — the Mix-unavailable branch cannot otherwise be
+  # exercised from a test suite that itself runs under Mix.
+  #
+  # `nil` (release / undetected) maps to the production-safe policy so that
+  # a release without explicit configuration does not serve a visible error
+  # image; the previous default was `:render_error_image`, which caused
+  # exactly that in production releases.
+  def __auto_policy__(env), do: auto_policy(env)
+
+  defp auto_policy(:prod), do: :fallback_to_source
+  defp auto_policy(nil), do: :fallback_to_source
+  defp auto_policy(_env), do: :render_error_image
 
   defp send_status_error(conn, error, status \\ nil) do
     status = status || Error.status(error)

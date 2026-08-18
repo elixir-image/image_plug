@@ -438,6 +438,31 @@ defmodule Image.PlugTest do
     end
   end
 
+  describe ":auto policy resolution" do
+    # `Image.Plug.__auto_policy__/1` is the pure mapping that `:auto`
+    # uses once the env has been detected. Testing it directly covers
+    # the release path (Mix stripped -> env == nil), which cannot be
+    # exercised end-to-end from a suite that itself runs under Mix.
+
+    test ":prod maps to :fallback_to_source (production-safe)" do
+      assert Image.Plug.__auto_policy__(:prod) == :fallback_to_source
+    end
+
+    test "nil (release, Mix unavailable) maps to :fallback_to_source" do
+      # Regression: a mix release strips Mix, so `Mix.env/0` is
+      # unavailable and env detection returns `nil`. Before the fix
+      # this fell through to `:render_error_image`, showing a visible
+      # error card in production (GitHub issue #3).
+      assert Image.Plug.__auto_policy__(nil) == :fallback_to_source
+    end
+
+    test ":dev, :test, and other envs map to :render_error_image" do
+      assert Image.Plug.__auto_policy__(:dev) == :render_error_image
+      assert Image.Plug.__auto_policy__(:test) == :render_error_image
+      assert Image.Plug.__auto_policy__(:staging) == :render_error_image
+    end
+  end
+
   describe "cache headers (M6)" do
     test "successful response carries ETag, Cache-Control, and Vary" do
       options = build_options()

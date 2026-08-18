@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file. See [Keep a
 
 * `Image.Plug` accepts `otp_app: :my_app` to read its configuration from the application environment on the first request instead of at compile time, so an Elixir release can configure the plug (for example a runtime `:mount` path) from `config/runtime.exs`. Inline options act as defaults overridden per key; an optional `:key` overrides the config key.
 
+### Fixed
+
+* `Image.Plug` no longer serves a visible error image from a mix release when `:on_error` is left at its default `:auto`. Mix is stripped from releases by design, so `Mix.env/0` was unavailable and env detection fell through to the dev-time `:render_error_image` policy. `:auto` now maps an undetected env to the production-safe `:fallback_to_source`, matching the behaviour of an explicit `config :image_plug, :env, :prod`. Thanks to @sntran for the report. Closes #3.
+
 ## [v0.2.0] — 2026-07-22
 
 ### Changed
